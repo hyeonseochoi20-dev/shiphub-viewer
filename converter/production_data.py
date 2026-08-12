@@ -45,31 +45,42 @@ def load_df(force=False):
 
 
 def get_models():
-    """지연 회귀/QA 분류 모델 + 인코더/스케일러 + 최근접이웃 인덱스를 최초 호출 시 1회 학습해서 캐싱"""
+    """지연 회귀/QA 분류 모델 + 인코더/스케일러 + 최근접이웃 인덱스를 최초 호출 시 1회 학습해서 캐싱.
+
+    MCP/REST API는 512MB 메모리 제한이 있는 서버(Render 무료 티어)에서도 돌아가야 하므로,
+    n_jobs=-1(멀티프로세스 - 워커마다 학습 데이터를 pickle로 복제해서 메모리를 배로 먹음)을 피하고
+    n_estimators/학습 표본 수를 줄인다 - EDA용 전체 정밀도가 필요한 app.py(별도 배포)와는 다른 용도라
+    라이브 데모 예측 품질에는 사실상 영향이 없다."""
     if "models" in _cache:
         return _cache["models"]
 
     df = load_df()
+    train_df = df.sample(n=min(len(df), 4000), random_state=0) if len(df) > 4000 else df
+
     oh_enc = OneHotEncoder(sparse_output=False)
-    oh_res = oh_enc.fit_transform(df[CATEGORICAL_COLS])
-    oh_df = pd.DataFrame(oh_res, columns=oh_enc.get_feature_names_out(), index=df.index)
-
+    oh_enc.fit(train_df[CATEGORICAL_COLS])
     scaler = StandardScaler()
-    scaled = scaler.fit_transform(df[MODEL_NUMERIC_COLS])
-    scaled_df = pd.DataFrame(scaled, columns=MODEL_NUMERIC_COLS, index=df.index)
+    scaler.fit(train_df[MODEL_NUMERIC_COLS])
 
-    X = pd.concat([scaled_df, oh_df], axis=1)
+    def transform(d):
+        oh = pd.DataFrame(oh_enc.transform(d[CATEGORICAL_COLS]), columns=oh_enc.get_feature_names_out(), index=d.index)
+        sc = pd.DataFrame(scaler.transform(d[MODEL_NUMERIC_COLS]), columns=MODEL_NUMERIC_COLS, index=d.index)
+        return pd.concat([sc, oh], axis=1)
 
-    reg = RandomForestRegressor(n_estimators=200, random_state=0, n_jobs=-1)
-    reg.fit(X, df["delay_days"])
+    X_train = transform(train_df)
+    reg = RandomForestRegressor(n_estimators=80, max_depth=12, random_state=0, n_jobs=1)
+    reg.fit(X_train, train_df["delay_days"])
 
-    clf = RandomForestClassifier(n_estimators=200, random_state=0, n_jobs=-1)
-    clf.fit(X, (df["qa_status"] == "합격").astype(int))
+    clf = RandomForestClassifier(n_estimators=80, max_depth=12, random_state=0, n_jobs=1)
+    clf.fit(X_train, (train_df["qa_status"] == "합격").astype(int))
 
+    # 유사 블록 검색(find_similar_blocks)은 df의 아무 block_id나 인덱싱할 수 있어야 하므로
+    # NearestNeighbors 인덱스만은 표본이 아니라 전체 데이터로 만든다 (RF 학습과 달리 메모리 부담이 적음)
+    X_full = transform(df)
     nn = NearestNeighbors(n_neighbors=11, metric="euclidean")
-    nn.fit(X)
+    nn.fit(X_full)
 
-    _cache["models"] = {"oh_enc": oh_enc, "scaler": scaler, "X": X, "reg": reg, "clf": clf, "nn": nn}
+    _cache["models"] = {"oh_enc": oh_enc, "scaler": scaler, "X": X_full, "reg": reg, "clf": clf, "nn": nn}
     return _cache["models"]
 
 
