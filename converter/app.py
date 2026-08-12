@@ -633,6 +633,12 @@ with tab3:
     null_counts = null_counts[null_counts > 0]
     if len(null_counts):
         st.bar_chart(null_counts)
+        null_pct = (null_counts / len(df) * 100)
+        st.caption(
+            "막대 높이 = 결측치 개수. "
+            + " · ".join(f"`{c}` 전체의 {p:.1f}%" for c, p in null_pct.items())
+            + f" — 두 컬럼 다 10% 미만이라 행을 통째로 버리기(dropna)보다 채워 넣는(fillna) 쪽이 데이터 손실이 적다."
+        )
     else:
         st.write("결측치 없음")
 
@@ -709,6 +715,19 @@ oh_df = pd.DataFrame(oh_res, columns=oh_enc.get_feature_names_out())
     oh_df = pd.DataFrame(oh_res, columns=oh_enc.get_feature_names_out(), index=df.index)
     st.dataframe(oh_df.head(), use_container_width=True)
 
+    cat_cardinalities = {c: df[c].nunique() for c in CATEGORICAL_COLS}
+    st.info(
+        f"**`fit_transform`이 실제로 한 일**: `fit()` 단계에서 `{CATEGORICAL_COLS}` 4개 컬럼 각각에 어떤 값들이 있는지 스캔해서 "
+        f"카테고리 목록(사전)을 학습한다 — "
+        + ", ".join(f"`{c}` {n}종" for c, n in cat_cardinalities.items())
+        + f" (합계 {sum(cat_cardinalities.values())}종). `transform()` 단계에서는 그 사전을 기준으로 "
+        f"각 행을 '해당하면 1, 아니면 0'인 이진 컬럼 **{oh_df.shape[1]}개**로 펼친다 "
+        f"({df.shape[1]}개였던 원본 컬럼 수와 무관하게, 범주형 4개 컬럼만 {oh_df.shape[1]}개로 확장됨).\n\n"
+        "왜 이렇게 하나: `department='기본설계'`처럼 문자열을 숫자로 그냥 1,2,3... 라벨링하면 모델이 "
+        "'부서 3이 부서 1보다 크다'는 식으로 존재하지도 않는 순서/크기 관계를 학습해버린다. "
+        "원핫인코딩은 각 카테고리를 독립된 0/1 축으로 분리해서 이 문제를 없앤다 — 대신 컬럼 수가 늘어나는 트레이드오프가 있다."
+    )
+
     st.subheader("3-6. 스케일링 (StandardScaler)")
     st.code("""
 from sklearn.preprocessing import StandardScaler
@@ -727,6 +746,19 @@ scaled = st_scaler.fit_transform(df[num_cols])
     with c2:
         st.write("**스케일링 후** (평균 0 / 표준편차 1)")
         st.dataframe(scaled_df.describe().round(2).loc[["mean", "std"]], use_container_width=True)
+
+    raw_ranges = df[NUMERIC_COLS].agg(["min", "max"])
+    biggest_col = raw_ranges.loc["max"].idxmax()
+    st.info(
+        f"**`fit_transform`이 실제로 한 일**: `fit()` 단계에서 `{NUMERIC_COLS}` 6개 컬럼 각각의 평균(mean)과 표준편차(std)를 계산해서 "
+        f"저장한다. `transform()` 단계에서는 그 값으로 모든 셀에 `(x - 평균) / 표준편차` 공식(z-score)을 적용한다.\n\n"
+        f"왜 필요한가: 스케일링 전에는 `{biggest_col}`처럼 값이 수만~수십만 단위인 컬럼과 `lod_level`처럼 1~3 단위인 컬럼이 "
+        f"같은 표에 섞여 있다. 이 상태로 거리·기울기 기반 모델(Linear/Ridge/Logistic Regression)에 넣으면 "
+        f"값의 '크기'가 클 뿐인 컬럼이 실제로는 더 중요하지 않은데도 모델에 더 큰 영향을 미치게 된다. "
+        "스케일링 후에는 모든 컬럼이 평균 0 · 표준편차 1로 같은 척도가 되어 이 왜곡이 사라진다 "
+        "(단, RandomForest 같은 트리 기반 모델은 값의 크기가 아니라 순서로 분기하기 때문에 스케일링 여부에 영향을 받지 않는다 — "
+        "그래도 여기서는 여러 모델을 동일 조건에서 비교하기 위해 전부 스케일링된 입력을 사용한다)."
+    )
 
     st.subheader("3-7. 데이터 누수(Data Leakage) 방지")
     st.markdown("""
@@ -748,6 +780,17 @@ model_scaled = model_scaler.fit_transform(df[model_num_cols])
     st.subheader("3-8. 최종 학습용 피처 테이블")
     st.write(f"결측치 처리 → datetime 변환 → 파생변수 → 인코딩 → 누수 컬럼 제외 스케일링을 모두 거친 최종 X shape: **{X_full.shape}**")
     st.dataframe(X_full.head(), use_container_width=True)
+    st.caption(
+        f"컬럼 구성: 스케일링된 수치형 {len(MODEL_NUMERIC_COLS)}개(`{', '.join(MODEL_NUMERIC_COLS)}`) "
+        f"+ 원핫인코딩된 범주형 {oh_df.shape[1]}개 = 총 {X_full.shape[1]}개 피처, {X_full.shape[0]:,}행. "
+        "이 표의 각 행이 RandomForest/LinearRegression 등 5번 탭 모델에 그대로 들어가는 X(입력 행렬)다."
+    )
+    st.caption(
+        "**참고(방법론 한계)**: 여기서는 `fit_transform`을 train/test 분할 이전, 전체 데이터에 대해 한 번에 수행한다. "
+        "엄밀한 실무 파이프라인이라면 `train_test_split` 이후 훈련셋에만 `fit`하고 테스트셋에는 `transform`만 적용해야 "
+        "테스트셋 정보가 스케일러/인코더 학습에 전혀 섞이지 않는다. 이번 프로젝트는 범주가 고정돼 있고 스케일이 크게 "
+        "흔들리지 않는 데이터라 실질적 영향은 미미하지만, 데이터 누수를 논할 때 같이 짚어야 하는 지점이라 명시해둔다."
+    )
 
     st.session_state["proc_df"] = df
     st.session_state["X_full"] = X_full
@@ -793,6 +836,22 @@ with tab4:
                 ax_h.set_xlabel("")
                 st.pyplot(fig_h)
 
+    delay_skew = fdf["delay_days"].skew()
+    tri_skew = fdf["triangle_count"].skew()
+    delay_shape = "오른쪽으로 긴 꼬리(양의 왜도)" if delay_skew > 0.3 else ("왼쪽으로 긴 꼬리(음의 왜도)" if delay_skew < -0.3 else "좌우 대칭에 가까움")
+    tri_shape = "오른쪽으로 긴 꼬리" if tri_skew > 0.3 else ("왼쪽으로 긴 꼬리" if tri_skew < -0.3 else "좌우 대칭에 가까움")
+    pct_over5 = (fdf["delay_days"] > 5).mean() * 100
+    st.info(
+        f"**읽는 법**: 막대가 특정 구간에 몰려있으면 대부분의 블록이 그 값대에 있다는 뜻이고, "
+        f"꼬리가 한쪽으로 길게 늘어지면(왜도, skewness) 소수의 극단값이 존재한다는 뜻이다.\n\n"
+        f"- `delay_days`(지연일수)는 왜도 **{delay_skew:.2f}** → **{delay_shape}**. "
+        f"전체 블록의 **{pct_over5:.1f}%**가 5일 넘게 지연되는 '롱테일' 형태로, "
+        f"평균만 보면 위험을 과소평가하기 쉽다 (그래서 회귀 예측에서 RMSE/R²를 같이 봐야 함).\n"
+        f"- `triangle_count`(삼각형 수, 형상 복잡도)는 왜도 **{tri_skew:.2f}** → **{tri_shape}**. "
+        f"이는 대부분 블록이 비슷한 복잡도지만 일부 초대형/초정밀 블록이 평균을 끌어올린다는 뜻으로, "
+        f"뒤에 나오는 상관관계·피처중요도 분석에서 `triangle_count`가 왜 핵심 변수인지의 배경이 된다."
+    )
+
     st.subheader("변수별 분포 (범주형 - 빈도)")
     st.code("for col in cat_cols: sns.countplot(x=col, data=df)", language="python")
     cat_cols_row = st.columns(len(CATEGORICAL_COLS))
@@ -801,6 +860,18 @@ with tab4:
             st.caption(f"**{col_name}**")
             st.bar_chart(fdf[col_name].value_counts())
 
+    balance_lines = []
+    for col_name in CATEGORICAL_COLS:
+        vc = fdf[col_name].value_counts()
+        ratio = vc.max() / vc.min() if vc.min() > 0 else float("inf")
+        tag = "균형적" if ratio < 1.5 else ("약간 불균형" if ratio < 3 else "뚜렷하게 불균형")
+        balance_lines.append(f"- `{col_name}`: 최다 **{vc.idxmax()}**({vc.max():,}건) vs 최소 **{vc.idxmin()}**({vc.min():,}건), 비율 {ratio:.1f}배 → **{tag}**")
+    st.info(
+        "**읽는 법**: 막대 높이가 서로 비슷하면 균형 데이터, 한쪽이 압도적으로 크면 불균형 데이터다. "
+        "특히 분류 모델(QA 합격/불합격)을 만들 때 클래스 불균형이 심하면 Accuracy가 높아도 소수 클래스를 못 맞출 수 있어 "
+        "F1-score를 같이 봐야 한다 (5번 탭에서 실제로 그렇게 처리함).\n\n" + "\n".join(balance_lines)
+    )
+
     st.subheader("상관관계 히트맵")
     st.code("sns.heatmap(df[num_cols].corr(), annot=True, cmap='RdBu_r')", language="python")
     corr = fdf[NUMERIC_COLS + ["delay_days"]].corr(numeric_only=True)
@@ -808,22 +879,52 @@ with tab4:
     sns.heatmap(corr, annot=True, fmt=".2f", cmap="RdBu_r", vmin=-1, vmax=1, ax=ax)
     st.pyplot(fig)
 
+    delay_corr = corr["delay_days"].drop("delay_days").sort_values(key=abs, ascending=False)
+    top_delay_var, top_delay_val = delay_corr.index[0], delay_corr.iloc[0]
+    st.info(
+        "**읽는 법**: 1에 가까울수록 진한 빨강(강한 양의 상관), -1에 가까울수록 진한 파랑(강한 음의 상관), "
+        "0에 가까우면 흰색(관계 없음). 대각선은 항상 1(자기 자신)이라 무시하면 된다.\n\n"
+        f"- `delay_days`(지연일수)와 가장 상관이 큰 변수는 **{top_delay_var}**(r={top_delay_val:+.2f})로, "
+        + ("절댓값이 0.3을 넘지 않아 **단일 변수만으로는 지연을 설명하기 어렵다** — 이것이 여러 변수를 조합하는 머신러닝 모델을 쓰는 이유다."
+           if abs(top_delay_val) < 0.3 else
+           f"{'값이 클수록 지연도 커지는' if top_delay_val > 0 else '값이 클수록 오히려 지연이 줄어드는'} 경향이 있다.") + "\n"
+        "- `triangle_count`(삼각형 수)와 `file_size_mb`(파일 크기)는 원래 같은 형상 데이터에서 나온 지표라 상관이 높게 나오기 쉬운데, "
+        "이 둘을 모델에 같이 넣으면 다중공선성(multicollinearity)으로 회귀계수 해석이 왜곡될 수 있어 "
+        "실제 모델에서는 트리 기반(RandomForest) 모델을 우선 비교한다 (트리 모델은 다중공선성에 상대적으로 덜 민감)."
+    )
+
     c1, c2, c3 = st.columns(3)
     with c1:
         st.subheader("부서별 평균 지연일")
-        st.bar_chart(fdf.groupby("department")["delay_days"].mean())
+        dept_delay = fdf.groupby("department")["delay_days"].mean().sort_values(ascending=False)
+        st.bar_chart(dept_delay)
+        st.caption(f"**{dept_delay.index[0]}**이 평균 {dept_delay.iloc[0]:.2f}일로 가장 지연이 크고, **{dept_delay.index[-1]}**이 {dept_delay.iloc[-1]:.2f}일로 가장 양호하다.")
     with c2:
         st.subheader("선종별 블록 수 · 평균 복잡도")
-        st.bar_chart(fdf.groupby("ship_type")["triangle_count"].mean())
+        ship_tri = fdf.groupby("ship_type")["triangle_count"].mean().sort_values(ascending=False)
+        st.bar_chart(ship_tri)
+        st.caption(f"**{ship_tri.index[0]}**의 평균 삼각형 수가 가장 많아(약 {ship_tri.iloc[0]:,.0f}개) 형상이 가장 복잡한 선종이다 — 계약금액·난이도계수가 높은 것과 일치하는지 1번 탭과 비교해볼 것.")
     with c3:
         st.subheader("우선순위별 지연일 분포")
         fig2, ax2 = plt.subplots(figsize=(5, 4))
         sns.boxplot(x="priority", y="delay_days", data=fdf, order=["High", "Medium", "Low"], ax=ax2)
         st.pyplot(fig2)
+        med_high = fdf[fdf["priority"] == "High"]["delay_days"].median()
+        med_low = fdf[fdf["priority"] == "Low"]["delay_days"].median()
+        st.caption(
+            f"박스는 중간 50%(1~3분위) 구간, 가운데 선은 중앙값. High 우선순위 중앙값 {med_high:.1f}일 vs Low {med_low:.1f}일"
+            + (" — 우선순위를 높여도 실제 지연이 크게 줄지 않는다는 뜻일 수 있어 공정 자체 개선이 더 중요할 수 있다." if med_high >= med_low - 0.5 else " — 우선순위 지정이 실제로 지연 완화에 효과가 있는 것으로 보인다.")
+        )
 
     st.subheader("월별 평균 지연일 추이")
-    monthly = pd.to_datetime(fdf["created_at"]).dt.to_period("M").astype(str)
-    st.line_chart(fdf.groupby(monthly)["delay_days"].mean())
+    monthly_series = fdf.groupby(pd.to_datetime(fdf["created_at"]).dt.to_period("M").astype(str))["delay_days"].mean()
+    st.line_chart(monthly_series)
+    if len(monthly_series) >= 2:
+        trend = monthly_series.iloc[-1] - monthly_series.iloc[0]
+        st.caption(
+            f"첫 달 {monthly_series.iloc[0]:.2f}일 → 마지막 달 {monthly_series.iloc[-1]:.2f}일"
+            + (f" (**{trend:+.2f}일**, 지연이 늘어나는 추세)" if trend > 0.2 else (f" (**{trend:+.2f}일**, 지연이 줄어드는 추세)" if trend < -0.2 else " — 뚜렷한 추세 없이 안정적."))
+        )
 
     if "contract_value_krw" in fdf.columns:
         st.subheader("선종별 계약금액 · 지체상금 노출액")
@@ -841,6 +942,14 @@ with tab4:
         with cf2:
             st.caption("선종별 척당 평균 지체상금 노출액(원)")
             st.bar_chart(ship_fin.set_index("ship_type")["지체상금노출액"])
+
+        top_exposure = ship_fin.sort_values("지체상금노출액", ascending=False).iloc[0]
+        st.info(
+            f"**시사점**: 왼쪽 그래프는 '얼마짜리 배인가'(계약 규모), 오른쪽은 '지금 속도로 계속 지연되면 위약금이 얼마나 쌓이는가'(리스크 금액)다. "
+            f"두 그래프의 순위가 다르다는 게 핵심 — 계약금액이 가장 큰 선종이 꼭 리스크가 가장 큰 선종은 아니다. "
+            f"지금 기준으로는 **{top_exposure['ship_type']}**의 지체상금 노출액이 가장 커서(척당 약 {top_exposure['지체상금노출액']:,.0f}원), "
+            f"공정 관리 우선순위를 정할 때 '비싼 배'가 아니라 '지연×계약금액이 큰 배'를 먼저 봐야 한다는 근거가 된다."
+        )
 
     with st.expander("원본 필터 데이터 보기"):
         st.dataframe(fdf, use_container_width=True)
@@ -899,12 +1008,37 @@ for name, model in models.items():
                 st.bar_chart(reg_result_df.set_index("모델")["R²"])
 
             best_reg_name = reg_result_df.loc[reg_result_df["R²"].idxmax(), "모델"]
-            st.success(f"최고 성능 회귀 모델: **{best_reg_name}** (R²={reg_result_df['R²'].max():.3f})")
+            best_r2 = reg_result_df["R²"].max()
+            worst_r2 = reg_result_df["R²"].min()
+            st.success(f"최고 성능 회귀 모델: **{best_reg_name}** (R²={best_r2:.3f})")
+            st.info(
+                f"**R²와 RMSE가 뭘 의미하나**: R²(결정계수)는 '실제 지연일수 변동 중 모델이 설명해내는 비율'이다. "
+                f"R²={best_r2:.2f}는 지연일수 편차의 약 **{best_r2*100:.0f}%**를 모델이 설명한다는 뜻이고, "
+                f"나머지 {(1-best_r2)*100:.0f}%는 모델이 못 잡아내는 우연/미측정 요인이다. "
+                f"RMSE는 '평균적으로 며칠 정도 틀리는가'를 원래 단위(일)로 보여준다 — "
+                f"{best_reg_name}의 RMSE는 예측이 실제 지연일수와 평균 {reg_result_df.loc[reg_result_df['모델']==best_reg_name, 'RMSE'].values[0]:.2f}일 정도 차이난다는 뜻.\n\n"
+                + (f"트리 기반인 **RandomForestRegressor**가 선형모델(LinearRegression/Ridge)보다 R²가 "
+                   f"{best_r2 - reg_result_df.loc[reg_result_df['모델'].str.contains('Linear'), 'R²'].values[0]:+.3f} 높다는 건, "
+                   f"지연일수와 입력 변수들의 관계가 **직선(선형)이 아니라 조건부·비선형적**이라는 뜻이다 "
+                   f"(예: '삼각형 수가 많으면서 동시에 우선순위가 낮을 때만' 지연이 확 커지는 식의 상호작용은 선형모델이 못 잡는다)."
+                   if "RandomForest" in best_reg_name else
+                   f"선형모델(**{best_reg_name}**)이 RandomForest보다 낫거나 비슷하다는 건, 데이터 안 관계가 비교적 단순·선형적이라 "
+                   f"복잡한 트리 모델이 오히려 노이즈에 과적합했을 가능성을 시사한다.")
+            )
 
         st.subheader("5-2. RandomForest 피처 중요도")
         rf = fitted_reg["RandomForestRegressor"]
         importance = pd.Series(rf.feature_importances_, index=X_full.columns).sort_values(ascending=False).head(10)
         st.bar_chart(importance)
+        top3 = importance.head(3)
+        st.info(
+            "**읽는 법**: 막대가 길수록 RandomForest가 예측할 때 그 피처를 더 자주/결정적으로 사용했다는 뜻이다 "
+            "(트리를 분기시킬 때 그 피처가 오차를 얼마나 줄였는지의 누적 기여도).\n\n"
+            f"가장 영향력 큰 3개는 **{top3.index[0]}**({top3.iloc[0]*100:.1f}%), **{top3.index[1]}**({top3.iloc[1]*100:.1f}%), "
+            f"**{top3.index[2]}**({top3.iloc[2]*100:.1f}%)로, 이 셋의 합이 전체 중요도의 {top3.sum()*100:.1f}%를 차지한다. "
+            "실무적으로는 '지연을 줄이려면 어디를 먼저 손봐야 하는가'에 대한 데이터 기반 우선순위이기도 하다 — "
+            "상위 피처가 원핫인코딩된 특정 부서/공정 단계라면, 해당 부서·공정의 병목을 먼저 조사해야 한다는 뜻이다."
+        )
 
         st.subheader("5-3. QA 합격 여부 분류 모델 비교")
         clf_models = {
@@ -924,6 +1058,19 @@ for name, model in models.items():
             fitted_clf[name] = model
         clf_result_df = pd.DataFrame(clf_results)
         st.dataframe(clf_result_df, hide_index=True, use_container_width=True)
+        pass_rate = yc_test.mean() * 100
+        best_clf_name = clf_result_df.loc[clf_result_df["F1"].idxmax(), "모델"]
+        st.info(
+            f"**Accuracy와 F1을 같이 보는 이유**: 테스트셋에서 실제 합격 비율이 **{pass_rate:.1f}%**다. "
+            + (f"합격이 압도적으로 많은 불균형 데이터라, '무조건 합격이라고 찍는' 바보 모델도 Accuracy {pass_rate:.1f}%가 나온다. "
+               f"그래서 Accuracy만으로는 모델이 실제로 불합격 케이스를 잡아내는지 알 수 없고, "
+               f"합격/불합격 각각을 얼마나 정확히·놓치지 않고 맞히는지를 종합한 F1-score를 같이 봐야 한다."
+               if pass_rate > 70 or pass_rate < 30 else
+               f"합격/불합격 비율이 비교적 균형적이라 Accuracy도 어느 정도 신뢰할 수 있지만, "
+               f"F1-score는 두 클래스를 고르게 잘 맞히는지까지 확인해준다.") + "\n\n"
+            f"**{best_clf_name}**가 F1 기준 최고 성능(F1={clf_result_df['F1'].max():.3f}) — "
+            "실시간 예측(7번 탭)의 QA 합격확률 예측은 이 표에서 학습된 RandomForestClassifier를 사용한다."
+        )
 
         st.session_state["fitted_reg"] = fitted_reg
         st.session_state["fitted_clf"] = fitted_clf
@@ -987,7 +1134,24 @@ grid.fit(X_train, y_train)
             st.json(grid.best_params_)
             st.session_state["fitted_reg"] = {**st.session_state.get("fitted_reg", {}), "RandomForest(Tuned)": best}
 
+            r2_gain = tuned_r2 - base_r2
+            st.info(
+                f"**GridSearchCV가 한 일**: `max_depth`(트리 최대 깊이) 3가지 × `min_samples_split`(분기에 필요한 최소 샘플 수) 3가지 × "
+                f"`min_samples_leaf`(리프 노드 최소 샘플 수) 3가지 = 총 **27가지 조합**을, "
+                f"각각 3-fold 교차검증(cv=3, 데이터를 3등분해서 번갈아 검증)으로 27×3=81번 학습·평가해 "
+                f"R²가 가장 높은 조합을 자동으로 골랐다.\n\n"
+                + (f"R²가 기본 대비 **{r2_gain:+.3f}** 개선됐다 — "
+                   f"기본 RandomForest(`n_estimators=200`, 깊이 제한 없음)가 이미 최적에 가까웠거나, "
+                   f"이 데이터 규모에서는 하이퍼파라미터보다 피처 자체(어떤 변수를 쓰는지)가 성능을 더 좌우한다는 뜻일 수 있다."
+                   if abs(r2_gain) < 0.01 else
+                   (f"R²가 기본 대비 **{r2_gain:+.3f}** 개선됐다 — 트리 깊이·분기 조건을 제한해서 훈련 데이터에 대한 과적합을 줄인 결과로 해석할 수 있다."
+                    if r2_gain > 0 else
+                    f"오히려 R²가 **{r2_gain:+.3f}** 낮아졌다 — GridSearchCV는 교차검증 평균 기준으로 최적을 고르기 때문에, "
+                    f"이 특정 테스트셋 하나에서는 기본 설정보다 살짝 못할 수 있다(과적합 방지와 특정 테스트셋 성능은 다른 문제)."))
+            )
+
         st.subheader("6-2. 다항 특성 (Polynomial Features) 실험")
+        st.caption("선형모델(Ridge)에 `x1×x2` 같은 변수 간 곱셈항을 추가해서, 선형모델도 비선형 관계 일부를 표현할 수 있게 하는 기법이다.")
         degree = st.slider("차수(degree)", 1, 3, 2)
         st.code(f"""
 poly = PolynomialFeatures(degree={degree}, include_bias=False)
@@ -1002,6 +1166,17 @@ ridge.fit(X_train_poly, y_train)
         ridge_poly.fit(X_train_poly, y_train)
         poly_r2 = r2_score(y_test, ridge_poly.predict(X_test_poly))
         st.metric(f"{degree}차 다항 + Ridge R²", f"{poly_r2:.3f}", delta=f"{poly_r2 - base_r2:+.3f} (기본 RF 대비)")
+        st.info(
+            f"**`fit_transform`이 한 일**: 원래 {X_train.shape[1]}개였던 피처를 {degree}차 조합(제곱항·교차항 포함)으로 늘려 "
+            f"**{X_train_poly.shape[1]}개**로 확장한 뒤, 그 확장된 입력으로 Ridge 회귀를 학습했다.\n\n"
+            + (f"차수를 올렸는데도 RandomForest(R²={base_r2:.3f})를 못 따라간다면, 이 문제는 몇 개 변수의 단순 곱셈 조합보다 "
+               f"'조건에 따라 다른 규칙이 적용되는' 트리 구조 쪽이 더 잘 맞는 문제라는 뜻이다. "
+               "차수를 3까지 올리면 피처 수가 급격히 늘어나 훈련 데이터에 과적합될 위험도 커지므로, "
+               "R²가 계속 오르지 않는다면 무작정 차수를 높이는 게 답이 아니다."
+               if poly_r2 <= base_r2 else
+               f"기본 RandomForest보다도 R²가 높게 나왔다 — 이 피처 조합에서는 몇몇 변수의 곱셈 관계(교차항)가 "
+               "지연일수를 설명하는 데 실제로 중요하다는 신호다.")
+        )
 
 # ---------------------------------------------------------------------------
 # 7. 실시간 예측
