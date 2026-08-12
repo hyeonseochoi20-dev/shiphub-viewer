@@ -279,7 +279,7 @@ export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
           </div>
 
           {similar && (
-            <div className="mt-2 border-t border-gray-700 pt-2">
+            <div ref={similarRef} className="mt-2 border-t border-gray-700 pt-2">
               <p className="text-[10px] text-gray-500 mb-1">{similar.method}</p>
               {similar.results.map((r) => (
                 <div key={r.block_id} className="text-[11px] text-gray-300 py-0.5 flex items-center justify-between gap-2">
