@@ -165,6 +165,10 @@ html, body, [class*="css"] {
     word-break: keep-all;
     overflow-wrap: break-word;
 }
+/* 위 [class*="css"] 셀렉터는 최신 Streamlit의 st-emotion-cache-* 클래스명과 매칭이 안 돼서
+   (emotion의 "cache"엔 css라는 부분 문자열이 없음) st.info/st.warning 같은 알림 박스 안 텍스트에는
+   실제로 안 먹고 있었다 - 전체 요소에 강제 적용해서 어디서든 한글이 음절 단위로 안 쪼개지게 한다. */
+* { word-break: keep-all !important; overflow-wrap: break-word !important; }
 
 .block-container { padding-top: 2.6rem; padding-bottom: 4rem; max-width: 1280px; }
 

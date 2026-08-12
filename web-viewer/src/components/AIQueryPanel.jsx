@@ -71,6 +71,8 @@ export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
     setLoading(false)
   }
 
+  const similarRef = useRef(null)
+
   const findSimilar = async (blockId) => {
     setLoading(true)
     setError(null)
@@ -79,6 +81,9 @@ export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '조회 실패')
       setSimilar(data)
+      // 유사 블록 결과가 긴 조회 결과 목록 아래에 붙기 때문에, 스크롤을 안 시키면
+      // 버튼을 눌러도 "아무 반응 없는 것"처럼 보인다 - 결과가 그려진 다음 프레임에 자동 스크롤한다
+      requestAnimationFrame(() => similarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
     } catch (e) {
       setError(e.message)
     }
