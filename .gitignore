@@ -1,0 +1,27 @@
+# 레포 범위 밖 (이번엔 converter/, web-viewer/만 push)
+desktop-viewer/
+shared/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+converter/*.db
+converter/output_models/
+converter/input_models/
+
+# 실제 DB 크리덴셜이 들어가는 로컬 실행 스크립트 - *.example.ps1만 커밋됨
+converter/run_dashboard.ps1
+converter/run_migration.ps1
+
+# Streamlit / Node
+.streamlit/secrets.toml
+node_modules/
+dist/
+build/
+
+# 기타
+.env
+*.local.json
+.DS_Store

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "shiphub-production": {
+      "command": "python",
+      "args": ["<PATH_TO_REPO>\\converter\\mcp_server.py"],
+      "env": {
+        "MARIADB_HOST": "<YOUR_MARIADB_HOST>",
+        "MARIADB_PORT": "<YOUR_MARIADB_PORT>",
+        "MARIADB_USER": "<YOUR_MARIADB_USER>",
+        "MARIADB_PASSWORD": "<YOUR_MARIADB_PASSWORD>"
+      }
+    }
+  }
+}

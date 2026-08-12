@@ -1,0 +1,17 @@
+ifcopenshell>=0.7.0
+flask>=2.0.0
+watchdog>=2.1.0
+ezdxf>=1.0.0
+numpy>=1.20.0
+
+# 생산관리 ML 대시보드 (app.py) + MariaDB 적재 (setup_mariadb.py)
+pandas>=2.0.0
+scikit-learn>=1.4.0
+matplotlib>=3.7.0
+seaborn>=0.13.0
+streamlit>=1.40.0
+pymysql>=1.1.0
+sqlalchemy>=2.0.0
+
+# MCP 서버 (mcp_server.py) - AI 에이전트가 생산 DB/예측 모델을 도구로 조회
+mcp[cli]>=2.0.0
