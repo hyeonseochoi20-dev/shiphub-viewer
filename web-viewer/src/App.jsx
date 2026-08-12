@@ -202,7 +202,9 @@ export default function App() {
 
       {view === 'dashboard' && (
         <iframe
-          src={STREAMLIT_URL}
+          // Streamlit Cloud는 ?embed=true 없이 열면 로그인/포털 래퍼로 서빙돼서 타 도메인 iframe 안에서 깨진다
+          // (외부 임베드 전용 렌더링 경로 - 공식 문서에 명시된 요구사항)
+          src={`${STREAMLIT_URL}${STREAMLIT_URL.includes('?') ? '&' : '?'}embed=true`}
           title="생산관리 대시보드"
           className="flex-1 w-full border-0"
         />
