@@ -82,8 +82,19 @@ export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
       if (!res.ok) throw new Error(data.error || '조회 실패')
       setSimilar(data)
       // 유사 블록 결과가 긴 조회 결과 목록 아래에 붙기 때문에, 스크롤을 안 시키면
-      // 버튼을 눌러도 "아무 반응 없는 것"처럼 보인다 - 결과가 그려진 다음 프레임에 자동 스크롤한다
-      requestAnimationFrame(() => similarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+      // 버튼을 눌러도 "아무 반응 없는 것"처럼 보인다. 패널 자체가 absolute 포지션이라
+      // scrollIntoView가 브라우저 창을 스크롤해버리는 경우가 있어서, 패널의 overflow-y-auto
+      // 컨테이너를 직접 찾아 그 안에서만 스크롤되도록 한다.
+      requestAnimationFrame(() => {
+        const el = similarRef.current
+        if (!el) return
+        const scrollParent = el.closest('.overflow-y-auto')
+        if (scrollParent) {
+          scrollParent.scrollTo({ top: el.offsetTop - scrollParent.offsetTop, behavior: 'smooth' })
+        } else {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      })
     } catch (e) {
       setError(e.message)
     }
