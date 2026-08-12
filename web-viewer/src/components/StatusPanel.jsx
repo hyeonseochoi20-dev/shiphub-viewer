@@ -25,7 +25,7 @@ export default function StatusPanel() {
   }, [])
 
   return (
-    <div className="bg-gray-800/80 backdrop-blur rounded-lg p-4 min-w-64 border border-gray-700">
+    <div className="bg-gray-800/80 backdrop-blur rounded-lg p-4 w-[min(16rem,90vw)] border border-gray-700">
       <h3 className="text-sm font-semibold mb-3 text-gray-300">시스템 상태</h3>
 
       <div className="space-y-2">

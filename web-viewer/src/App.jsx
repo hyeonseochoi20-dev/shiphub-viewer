@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment, GizmoHelper, GizmoViewcube } from '@react-three/drei'
-import { FiRotateCw, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
+import { FiRotateCw, FiChevronLeft, FiChevronRight, FiSliders, FiZap, FiInfo, FiUploadCloud, FiX, FiMenu } from 'react-icons/fi'
+import useIsMobile from './hooks/useIsMobile'
 import ShipModel from './components/ShipModel'
 import FLNGShip from './components/FLNGShip'
 import FileTree from './components/FileTree'
@@ -59,7 +60,14 @@ export default function App() {
     lod: 1
   })
 
+  const isMobile = useIsMobile()
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [mobileSheet, setMobileSheet] = useState(null) // null | 'tools' | 'ai' | 'info' | 'batch'
+
+  useEffect(() => {
+    // 모바일에서는 사이드바가 캔버스를 밀어내지 않고 오버레이 드로어로 뜨므로 기본값은 닫힘
+    setSidebarOpen(!isMobile)
+  }, [isMobile])
   const [showGrid, setShowGrid] = useState(false)
   const [activeTool, setActiveTool] = useState(null) // 'measure' | 'section' | 'clash' | null
   const [sectionAxis, setSectionAxis] = useState('x')
@@ -149,26 +157,35 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col bg-gray-900 text-white">
       {/* 헤더 */}
-      <header className="h-16 bg-gray-800 border-b border-gray-700 flex items-center px-4 gap-4">
+      <header className="h-14 md:h-16 bg-gray-800 border-b border-gray-700 flex items-center px-2 md:px-4 gap-2 md:gap-4 shrink-0">
+        {view === 'viewer' && (
+          <button
+            onClick={() => setSidebarOpen((v) => !v)}
+            className="md:hidden p-2 -ml-1 text-gray-300 hover:bg-gray-700 rounded"
+            title="파일 목록"
+          >
+            <FiMenu className="w-5 h-5" />
+          </button>
+        )}
         <Logo />
         <nav className="ml-auto flex gap-1">
           <button
             onClick={() => setView('viewer')}
-            className={`px-3 py-1.5 rounded text-sm font-medium ${view === 'viewer' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}
+            className={`px-2 md:px-3 py-1.5 rounded text-xs md:text-sm font-medium whitespace-nowrap ${view === 'viewer' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}
           >
-            3D 뷰어
+            {isMobile ? '뷰어' : '3D 뷰어'}
           </button>
           <button
             onClick={() => setView('dashboard')}
-            className={`px-3 py-1.5 rounded text-sm font-medium ${view === 'dashboard' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}
+            className={`px-2 md:px-3 py-1.5 rounded text-xs md:text-sm font-medium whitespace-nowrap ${view === 'dashboard' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}
           >
-            생산관리 대시보드
+            {isMobile ? '대시보드' : '생산관리 대시보드'}
           </button>
           <button
             onClick={() => setView('dossier')}
-            className={`px-3 py-1.5 rounded text-sm font-medium ${view === 'dossier' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}
+            className={`px-2 md:px-3 py-1.5 rounded text-xs md:text-sm font-medium whitespace-nowrap ${view === 'dossier' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}
           >
-            프로젝트 소개
+            {isMobile ? '소개' : '프로젝트 소개'}
           </button>
         </nav>
       </header>
@@ -190,23 +207,40 @@ export default function App() {
       )}
 
       <div className={`flex-1 overflow-hidden relative ${view === 'viewer' ? 'flex' : 'hidden'}`}>
+          {/* 모바일: 사이드바가 캔버스를 밀어내는 대신 오버레이 드로어로 뜬다 (뒷배경 탭하면 닫힘) */}
+          {isMobile && sidebarOpen && (
+            <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 bg-black/60 z-40" />
+          )}
+
           {/* 사이드바 - 파일 트리 (접기/펼치기) */}
           <aside
-            className={`bg-gray-800 border-r border-gray-700 overflow-y-auto transition-all duration-200 ${
-              sidebarOpen ? 'w-80' : 'w-0 border-r-0'
-            }`}
+            className={
+              isMobile
+                ? `fixed top-14 bottom-0 left-0 z-50 w-[85vw] max-w-xs bg-gray-800 border-r border-gray-700 overflow-y-auto transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
+                : `bg-gray-800 border-r border-gray-700 overflow-y-auto transition-all duration-200 ${sidebarOpen ? 'w-80' : 'w-0 border-r-0'}`
+            }
           >
-            <div className="w-80">
-              <FileTree onSelect={setSelectedModel} />
+            <div className={isMobile ? 'w-[85vw] max-w-xs relative' : 'w-80'}>
+              {isMobile && (
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="absolute top-3 right-3 z-10 p-1.5 bg-gray-700 rounded text-gray-300 hover:text-white"
+                >
+                  <FiX className="w-4 h-4" />
+                </button>
+              )}
+              <FileTree onSelect={(m) => { setSelectedModel(m); if (isMobile) setSidebarOpen(false) }} />
             </div>
           </aside>
-          <button
-            onClick={() => setSidebarOpen((v) => !v)}
-            className="self-start mt-3 -ml-px z-10 flex items-center justify-center w-5 h-10 bg-gray-800 border border-gray-700 rounded-r-md text-gray-400 hover:text-white hover:bg-gray-700"
-            title={sidebarOpen ? '사이드바 접기' : '사이드바 펼치기'}
-          >
-            {sidebarOpen ? <FiChevronLeft className="w-3.5 h-3.5" /> : <FiChevronRight className="w-3.5 h-3.5" />}
-          </button>
+          {!isMobile && (
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              className="self-start mt-3 -ml-px z-10 flex items-center justify-center w-5 h-10 bg-gray-800 border border-gray-700 rounded-r-md text-gray-400 hover:text-white hover:bg-gray-700"
+              title={sidebarOpen ? '사이드바 접기' : '사이드바 펼치기'}
+            >
+              {sidebarOpen ? <FiChevronLeft className="w-3.5 h-3.5" /> : <FiChevronRight className="w-3.5 h-3.5" />}
+            </button>
+          )}
 
           {/* 3D 뷰어 영역 */}
           <main className="flex-1 relative">
@@ -276,54 +310,104 @@ export default function App() {
             </Canvas>
             </ViewerErrorBoundary>
 
-            {/* 상태 패널 */}
-            <div className="absolute top-4 right-4 space-y-3">
-              <AIQueryPanel />
-              <StatusPanel />
-              <ModulePanel />
-              <SavedViewsPanel
-                views={savedViews}
-                onSave={saveCurrentView}
-                onJump={(v) => setJumpTarget(v)}
-                onDelete={(id) => setSavedViews((prev) => prev.filter((v) => v.id !== id))}
-              />
-            </div>
+            {(() => {
+              const toolsPanelEl = (
+                <ToolsPanel
+                  showGrid={showGrid}
+                  onToggleGrid={() => setShowGrid((v) => !v)}
+                  activeTool={activeTool}
+                  onSetTool={setActiveTool}
+                  sectionAxis={sectionAxis}
+                  onSectionAxisChange={setSectionAxis}
+                  sectionPos={sectionPos}
+                  onSectionPosChange={setSectionPos}
+                  sectionFlipped={sectionFlipped}
+                  onSectionFlipToggle={() => setSectionFlipped((v) => !v)}
+                  clashResults={clashResults}
+                  erectionProgress={erectionProgress}
+                  onErectionProgressChange={setErectionProgress}
+                  erectionPlaying={erectionPlaying}
+                  onToggleErectionPlaying={toggleErectionPlaying}
+                  erectionStage={erectionStageLabel(erectionProgress)}
+                  deckFraction={deckFraction}
+                  onDeckFractionChange={handleDeckFractionChange}
+                  deckFractionDefault={DECK_FRACTION_DEFAULTS[modelCreditKey(selectedModel?.url)] ?? 0.37}
+                  deckFractionVerified={DECK_FRACTION_VERIFIED[modelCreditKey(selectedModel?.url)] ?? false}
+                />
+              )
+              const infoStackEl = (
+                <>
+                  <StatusPanel />
+                  <ModulePanel />
+                  <SavedViewsPanel
+                    views={savedViews}
+                    onSave={saveCurrentView}
+                    onJump={(v) => setJumpTarget(v)}
+                    onDelete={(id) => setSavedViews((prev) => prev.filter((v) => v.id !== id))}
+                  />
+                </>
+              )
 
-            {/* 조선 검토 도구 */}
-            <div className="absolute top-4 left-4">
-              <ToolsPanel
-                showGrid={showGrid}
-                onToggleGrid={() => setShowGrid((v) => !v)}
-                activeTool={activeTool}
-                onSetTool={setActiveTool}
-                sectionAxis={sectionAxis}
-                onSectionAxisChange={setSectionAxis}
-                sectionPos={sectionPos}
-                onSectionPosChange={setSectionPos}
-                sectionFlipped={sectionFlipped}
-                onSectionFlipToggle={() => setSectionFlipped((v) => !v)}
-                clashResults={clashResults}
-                erectionProgress={erectionProgress}
-                onErectionProgressChange={setErectionProgress}
-                erectionPlaying={erectionPlaying}
-                onToggleErectionPlaying={toggleErectionPlaying}
-                erectionStage={erectionStageLabel(erectionProgress)}
-                deckFraction={deckFraction}
-                onDeckFractionChange={handleDeckFractionChange}
-                deckFractionDefault={DECK_FRACTION_DEFAULTS[modelCreditKey(selectedModel?.url)] ?? 0.37}
-                deckFractionVerified={DECK_FRACTION_VERIFIED[modelCreditKey(selectedModel?.url)] ?? false}
-              />
-            </div>
+              if (isMobile) {
+                const sheets = {
+                  tools: { label: '도구', icon: FiSliders, content: toolsPanelEl },
+                  ai: { label: 'AI', icon: FiZap, content: <AIQueryPanel forceOpen /> },
+                  info: { label: '정보', icon: FiInfo, content: <div className="space-y-3">{infoStackEl}</div> },
+                  batch: { label: '배치', icon: FiUploadCloud, content: <BatchPanel /> },
+                }
+                return (
+                  <>
+                    {mobileSheet && (
+                      <div onClick={() => setMobileSheet(null)} className="fixed inset-0 bg-black/50 z-40" />
+                    )}
+                    {mobileSheet && (
+                      <div className="fixed inset-x-0 bottom-14 z-50 max-h-[70vh] overflow-y-auto bg-gray-900/95 backdrop-blur border-t border-gray-700 rounded-t-2xl px-3 pt-3 pb-4 flex justify-center">
+                        {sheets[mobileSheet].content}
+                      </div>
+                    )}
+                    <nav className="fixed bottom-0 inset-x-0 z-50 h-14 bg-gray-800 border-t border-gray-700 flex items-stretch">
+                      {Object.entries(sheets).map(([key, s]) => (
+                        <button
+                          key={key}
+                          onClick={() => setMobileSheet((cur) => (cur === key ? null : key))}
+                          className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium ${
+                            mobileSheet === key ? 'text-blue-400 bg-gray-700/60' : 'text-gray-400'
+                          }`}
+                        >
+                          <s.icon className="w-4 h-4" />
+                          {s.label}
+                        </button>
+                      ))}
+                    </nav>
+                  </>
+                )
+              }
 
-            {/* 배치 패널 */}
-            <div className="absolute bottom-4 right-4">
-              <BatchPanel />
-            </div>
+              return (
+                <>
+                  {/* 상태 패널 */}
+                  <div className="absolute top-4 right-4 space-y-3">
+                    <AIQueryPanel />
+                    {infoStackEl}
+                  </div>
+
+                  {/* 조선 검토 도구 */}
+                  <div className="absolute top-4 left-4">
+                    {toolsPanelEl}
+                  </div>
+
+                  {/* 배치 패널 */}
+                  <div className="absolute bottom-4 right-4">
+                    <BatchPanel />
+                  </div>
+                </>
+              )
+            })()}
 
             {/* 자동 회전 토글 */}
             <button
               onClick={() => setAutoRotate((v) => !v)}
-              className={`absolute bottom-16 left-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+              className={`absolute ${isMobile ? 'bottom-28' : 'bottom-16'} left-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                 autoRotate
                   ? 'bg-blue-600 border-blue-500 text-white'
                   : 'bg-gray-800/90 border-gray-700 text-gray-300 hover:bg-gray-700'
@@ -335,7 +419,7 @@ export default function App() {
 
             {/* CC-BY 크레딧 (Sketchfab 샘플 선박 모델) */}
             {selectedModel?.type === 'gltf' && MODEL_CREDITS[modelCreditKey(selectedModel?.url)] && (
-              <div className="absolute bottom-4 left-4 text-[11px] text-gray-500 bg-gray-900/60 px-2 py-1 rounded">
+              <div className={`absolute ${isMobile ? 'bottom-16' : 'bottom-4'} left-4 text-[11px] text-gray-500 bg-gray-900/60 px-2 py-1 rounded`}>
                 {(() => {
                   const c = MODEL_CREDITS[modelCreditKey(selectedModel.url)]
                   return (

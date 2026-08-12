@@ -23,7 +23,7 @@ export default function ModulePanel() {
   }, [])
 
   return (
-    <div className="bg-gray-800/90 backdrop-blur border border-gray-700 rounded-lg p-3 w-64 text-sm">
+    <div className="bg-gray-800/90 backdrop-blur border border-gray-700 rounded-lg p-3 w-[min(16rem,90vw)] text-sm">
       <h3 className="font-semibold mb-2 text-gray-200">지원 포맷 모듈</h3>
       <div className="space-y-1.5">
         {modules.map((m) => (

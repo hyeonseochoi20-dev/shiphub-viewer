@@ -13,7 +13,7 @@ export default function SavedViewsPanel({ views, onSave, onJump, onDelete }) {
   }
 
   return (
-    <div className="bg-gray-800/90 backdrop-blur border border-gray-700 rounded-lg p-3 w-64 text-sm">
+    <div className="bg-gray-800/90 backdrop-blur border border-gray-700 rounded-lg p-3 w-[min(16rem,90vw)] text-sm">
       <button onClick={() => setOpen((v) => !v)} className="w-full flex items-center gap-1.5 text-gray-200 font-semibold">
         <FiCamera className="w-3.5 h-3.5 text-cyan-400" />
         <span className="flex-1 text-left">저장된 뷰</span>

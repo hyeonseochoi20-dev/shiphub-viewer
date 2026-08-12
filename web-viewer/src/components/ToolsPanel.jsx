@@ -90,7 +90,7 @@ export default function ToolsPanel({
   }
 
   return (
-    <div className="bg-gray-800/90 backdrop-blur border border-gray-700 rounded-lg p-3 w-64 text-sm">
+    <div className="bg-gray-800/90 backdrop-blur border border-gray-700 rounded-lg p-3 w-[min(16rem,90vw)] text-sm">
       <h3 className="font-semibold mb-2 text-gray-200">검토 도구</h3>
 
       {/* ShipGrid - 단독 토글 (0뎁스) */}

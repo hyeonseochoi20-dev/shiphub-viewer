@@ -134,7 +134,7 @@ export default function BatchPanel() {
   }
 
   return (
-    <div className="bg-gray-800/90 backdrop-blur rounded-lg p-4 min-w-80 border border-gray-700">
+    <div className="bg-gray-800/90 backdrop-blur rounded-lg p-4 w-[min(20rem,90vw)] border border-gray-700">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-gray-300">배치 변환</h3>
         <div className="flex gap-2">

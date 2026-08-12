@@ -4,7 +4,7 @@ import { API_BASE } from '../config'
 
 // MariaDB 생산 DB를 REST로 직접 조회하는 패널 (converter.py의 /api/ai/* 엔드포인트,
 // production_data.py 공용 로직 - mcp_server.py와 동일한 쿼리/모델을 로컬 HTTP로 노출)
-export default function AIQueryPanel() {
+export default function AIQueryPanel({ forceOpen = false }) {
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState('faq') // 'faq' | 'query' | 'predict'
   const [filters, setFilters] = useState(null)
@@ -104,7 +104,7 @@ export default function AIQueryPanel() {
     setLoading(false)
   }
 
-  if (!open) {
+  if (!open && !forceOpen) {
     return (
       <button
         onClick={() => setOpen(true)}
@@ -119,7 +119,7 @@ export default function AIQueryPanel() {
   const selectClass = 'bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200'
 
   return (
-    <div className="bg-gray-800/90 backdrop-blur rounded-lg p-4 w-96 border border-gray-700 max-h-[70vh] overflow-y-auto">
+    <div className="bg-gray-800/90 backdrop-blur rounded-lg p-4 w-[min(24rem,90vw)] border border-gray-700 max-h-[70vh] overflow-y-auto">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-1.5">
           <FiZap className="w-3.5 h-3.5" /> AI 쿼리 (MariaDB 실시간)
