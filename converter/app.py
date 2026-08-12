@@ -20,7 +20,7 @@ import seaborn as sns
 import sqlalchemy as sa
 import streamlit as st
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.linear_model import Lasso, LinearRegression, LogisticRegression, Ridge
+from sklearn.linear_model import ElasticNet, Lasso, LinearRegression, LogisticRegression, Ridge
 from sklearn.metrics import (
     accuracy_score, f1_score, mean_absolute_error, mean_squared_error, r2_score, root_mean_squared_error,
 )
@@ -380,6 +380,7 @@ def train_regression_models(X_full, y_delay):
         "LinearRegression": LinearRegression(),
         "Ridge(alpha=1.0)": Ridge(alpha=1.0),
         "Lasso(alpha=0.1)": Lasso(alpha=0.1),
+        "ElasticNet(alpha=0.1)": ElasticNet(alpha=0.1, l1_ratio=0.5),
         "RandomForestRegressor": RandomForestRegressor(n_estimators=200, random_state=0, n_jobs=-1),
     }
     results = []
@@ -1031,8 +1032,9 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
         st.code("""
 models = {
     'LinearRegression': LinearRegression(),
-    'Ridge': Ridge(alpha=1.0),
-    'Lasso': Lasso(alpha=0.1),
+    'Ridge': Ridge(alpha=1.0),          # L2 규제 - 계수를 0에 가깝게 축소
+    'Lasso': Lasso(alpha=0.1),          # L1 규제 - 불필요한 계수를 정확히 0으로 (자동 피처 선택 효과)
+    'ElasticNet': ElasticNet(alpha=0.1, l1_ratio=0.5),  # L1+L2 절충
     'RandomForestRegressor': RandomForestRegressor(n_estimators=200, random_state=0, n_jobs=-1),
 }
 for name, model in models.items():
