@@ -6,7 +6,7 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
+    port: 80, // 같은 와이파이의 폰에서 포트 번호 없이 IP만 쳐도 열리도록 (10.0.0.16처럼)
     host: true, // 0.0.0.0 + :: 모두 바인드 - 기본값(IPv6 루프백만 바인드)이라 브라우저의 IPv4 localhost 해석과 안 맞았음
     open: true,
     proxy: {

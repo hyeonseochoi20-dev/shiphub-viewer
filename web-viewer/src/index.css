@@ -6,6 +6,10 @@
 body {
   @apply bg-gray-900 text-white;
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* 좁은 패널에서 "최근 변환"이 "최근 변/환"처럼 음절 단위로 쪼개지는 것 방지 -
+     한국어는 어절 단위(공백 기준)로만 줄바꿈하고, 그래도 넘치면 overflow-wrap이 처리 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 /* 3D 캔버스 스타일 */
