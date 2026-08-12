@@ -622,6 +622,65 @@ with tab1:
     ], columns=["컬럼", "타입", "설명"])
     st.dataframe(col_doc, hide_index=True, use_container_width=True)
 
+    st.markdown('<div class="card-title" style="margin-top:1.2rem;">데이터 출처 투명성 — 컬럼별 근거 등급</div>', unsafe_allow_html=True)
+    st.markdown("""
+이 데이터셋은 **완전한 실측 데이터가 아니다** — 조선소 생산 블록의 개별 공정 지연·QA 기록은 어느 조선사도
+외부에 공개하지 않는 영업비밀이라(자전거 대여량 같은 공공 인프라 데이터와 근본적으로 다름), 실제로 이런
+공개 데이터셋은 Kaggle·공공데이터포털 어디에도 존재하지 않는다. 그래서 이 프로젝트는 **컬럼마다 근거 등급을
+명시**하는 방식으로 신뢰성을 확보한다 — "무엇이 실제 자료 기반이고 무엇이 통계적 가정인지"를 숨기지 않는 것 자체가
+데이터 정합성 검증의 일부라고 본다.
+""")
+    tier_legend = st.columns(3)
+    with tier_legend[0]:
+        st.markdown(
+            '<div style="border:1px solid rgba(74,222,128,0.35);border-radius:8px;padding:10px 12px;background:rgba(74,222,128,0.06);">'
+            '<b style="color:#4ade80;">🟢 실제 공시 자료</b><br>'
+            '<span style="font-size:0.82rem;color:#a3a3a3;">외부 공식 자료의 수치를 그대로 파라미터에 반영</span></div>',
+            unsafe_allow_html=True,
+        )
+    with tier_legend[1]:
+        st.markdown(
+            '<div style="border:1px solid rgba(96,165,250,0.35);border-radius:8px;padding:10px 12px;background:rgba(96,165,250,0.06);">'
+            '<b style="color:#60a5fa;">🔵 실제 자료 캘리브레이션</b><br>'
+            '<span style="font-size:0.82rem;color:#a3a3a3;">개별 값은 생성이지만, 분포의 평균·비율·범위가 실제 공시자료로 보정됨</span></div>',
+            unsafe_allow_html=True,
+        )
+    with tier_legend[2]:
+        st.markdown(
+            '<div style="border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:10px 12px;background:rgba(255,255,255,0.03);">'
+            '<b style="color:#d4d4d8;">⚪ 통계적 가정</b><br>'
+            '<span style="font-size:0.82rem;color:#a3a3a3;">외부 실측 출처는 없으나, 명시된 업계 벤치마크·통계 원리로 현실성 확보</span></div>',
+            unsafe_allow_html=True,
+        )
+
+    source_doc = pd.DataFrame([
+        ("ship_type / vessel_id (척수)", "🔵 실제 자료 캘리브레이션",
+         "2026년 삼성중공업 실제 상선 수주 공시(LNG 14척·VLCC 12척·가스운반선 4척·컨테이너선 2척·에탄운반선 2척, 뉴스핌·edaily 보도) × 평균 건조기간(2~3년)으로 '동시 건조 규모' 확장 추정"),
+        ("contract_value_krw", "🔵 실제 자료 캘리브레이션",
+         "실제 계약 공시(LNG운반선 1척 3,855억원, 2026-06) + 선종별 최근 시장가 근거"),
+        ("지체상금 회피가치 계산식 (히어로 섹션)", "🟢 실제 공시 자료",
+         "지체상금 = 계약금액 × 0.13%/일 — 지자체 계약 시행규칙상 법정 표준요율을 그대로 사용 (가정 없음)"),
+        ("전사 확산 헤드카운트 기본값 3,800명", "🔵 실제 자료 캘리브레이션",
+         "DART 2023 사업보고서 실제 임직원수 9,640명 × 설계/생산 엔지니어링 비중 40% 가정"),
+        ("5년 중량 CAD 라이선스 TCO 8,000만원", "🔵 실제 자료 캘리브레이션",
+         "Siemens NX 공급사 발표 가격(기본형 시트당 약 $9,000 + 연 유지보수 20%) 기준 5년 보유비용 산정"),
+        ("department 시급(hourly_cost_krw)", "⚪ 통계적 가정",
+         "직급/부서별 실무 엔지니어 시급 참고 수준의 가정 — 통계청/고용노동부 공시 데이터와 직접 연결되지는 않음(정직하게 명시)"),
+        ("triangle_count 분포", "⚪ 통계적 가정",
+         "CAD/BIM 업계 벤치마크(1~2M 삼각형에서 통합GPU 버벅임 시작, Draco 압축이 70~95% 절감) 기준 lognormal 분포로 '압축 후 출력값'다운 규모·왜도 설정"),
+        ("file_size_mb", "⚪ 통계적 가정", "triangle_count에 비례 + 노이즈 (형상 복잡도와 파일 크기의 실제 상관관계 모사)"),
+        ("delay_days / qa_defect_count", "⚪ 통계적 가정",
+         "'형상이 복잡할수록 공정 지연·QA 결함 확률이 커진다'는 조선 실무 통념을 lognormal + 조건부 규칙으로 생성 — 롱테일(가끔 크게 지연) 형태까지 반영"),
+        ("block_name / created_at", "⚪ 통계적 가정", "식별자 규칙 생성, 최근 180일 균등 분산 — 값 자체에 실무적 의미 없음"),
+    ], columns=["대상", "등급", "근거"])
+    st.dataframe(source_doc, hide_index=True, use_container_width=True)
+    st.caption(
+        "**왜 이렇게 혼합했나**: 회귀 문제 특성상 예측 타깃(`delay_days`)과 입력(`triangle_count` 등)의 관계 자체는 "
+        "내가 생성 규칙으로 주입한 것이라, 모델이 그 규칙을 '재발견'하는 것은 엄밀히는 순환논리라는 한계가 있다. "
+        "이를 완전히 해소하려면 외부에서 독립적으로 결정되는 실측 신호(예: 실제 기상청 API의 과거 기상데이터 — "
+        "도장·야외 용접 등 일부 공정은 실제로 날씨 영향을 받는다)를 회귀 입력에 추가로 결합하는 것이 다음 개선 방향이다."
+    )
+
 # ---------------------------------------------------------------------------
 # 2. 데이터 준비
 # ---------------------------------------------------------------------------
