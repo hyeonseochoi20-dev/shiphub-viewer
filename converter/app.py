@@ -258,61 +258,14 @@ h2, h3, h4 { letter-spacing: -0.012em; }
     background-attachment: fixed;
 }
 
-/* 사이드바 필터 위젯 - 기본 스트림릿 테마의 primaryColor(진한 파랑)가 선택박스 배경/테두리/포커스링/
-   체크박스/라디오/드롭다운 옵션 하이라이트 등 거의 모든 인터랙티브 요소에 그대로 노출되어 "커스텀 안 하고
-   기본 스트림릿 그대로 쓴 것" 같은 인상을 줬음. 사이드바 안에서는 파랑 강조색을 전부 중성 회색 계열로 눌러준다. */
+/* 사이드바 - 삼성중공업 톤앤매너에 맞는 하늘색 강조색을 그대로 살린다 (primaryColor, config.toml 참고) */
 [data-testid="stSidebar"] {
     background: rgba(255,255,255,0.014);
     border-right: 1px solid rgba(255,255,255,0.06);
 }
 
-/* 선택박스(멀티셀렉트/셀렉트박스) 컨트롤 전체 - 자식 depth 상관없이 전부 중성 회색으로 */
-[data-testid="stSidebar"] [data-baseweb="select"],
-[data-testid="stSidebar"] [data-baseweb="select"] > div,
-[data-testid="stSidebar"] [data-baseweb="select"] div[class] {
-    background-color: rgba(255,255,255,0.05) !important;
-    border-color: rgba(255,255,255,0.10) !important;
-}
-[data-testid="stSidebar"] [data-baseweb="select"]:focus-within,
-[data-testid="stSidebar"] [data-baseweb="select"]:hover {
-    border-color: rgba(255,255,255,0.24) !important;
-    box-shadow: none !important;
-}
-
-/* 선택된 값 칩(태그) */
-[data-testid="stSidebar"] [data-baseweb="tag"] {
-    background-color: rgba(255,255,255,0.11) !important;
-    border: 1px solid rgba(255,255,255,0.16) !important;
-    color: #d4d4d8 !important;
-}
-[data-testid="stSidebar"] [data-baseweb="tag"] span { color: #d4d4d8 !important; }
-[data-testid="stSidebar"] [data-baseweb="tag"] svg { fill: #a1a1aa !important; }
-
-/* 드롭다운을 펼쳤을 때 나오는 옵션 목록 - 호버/선택된 옵션 배경이 파랑이었던 것을 중성 회색으로 */
-[data-baseweb="popover"] [role="listbox"] { background-color: #16161a !important; border: 1px solid rgba(255,255,255,0.1) !important; }
-[data-baseweb="popover"] [role="option"] { background-color: transparent !important; color: #d4d4d8 !important; }
-[data-baseweb="popover"] [role="option"]:hover,
-[data-baseweb="popover"] [role="option"][aria-selected="true"] { background-color: rgba(255,255,255,0.08) !important; }
-
-/* 체크박스/라디오 - 선택된(checked) 상태의 파란 배경을 중성 톤으로 */
-[data-testid="stSidebar"] [role="radiogroup"] label { color: #d4d4d8; }
-[data-testid="stSidebar"] [data-baseweb="radio"] div:first-child,
-[data-testid="stSidebar"] [data-baseweb="checkbox"] div:first-child {
-    border-color: rgba(255,255,255,0.28) !important;
-}
-[data-testid="stSidebar"] [aria-checked="true"] > div:first-child {
-    background-color: rgba(255,255,255,0.65) !important;
-    border-color: rgba(255,255,255,0.65) !important;
-}
-
-/* 슬라이더 - 트랙/썸을 좀 더 또렷하게. 사이드바(기간 select_slider)는 채워진 트랙 색까지 파랑이라 눈에 띄었어서 회색 계열로 낮춤 */
-[data-testid="stSlider"] [data-baseweb="slider"] > div > div { background: rgba(255,255,255,0.12) !important; }
+/* 슬라이더 썸 포커스링만 강조색과 어울리게 살짝 다듬음 */
 [data-testid="stSlider"] [role="slider"] { box-shadow: 0 0 0 4px rgba(59,130,246,0.18) !important; }
-[data-testid="stSidebar"] [data-testid="stSlider"] [data-baseweb="slider"] div[class] { background-color: rgba(255,255,255,0.16) !important; }
-[data-testid="stSidebar"] [data-testid="stSlider"] [role="slider"] {
-    background-color: #9aa1ac !important;
-    box-shadow: 0 0 0 4px rgba(255,255,255,0.12) !important;
-}
 
 /* 글래스 카드 호버 시 살짝 떠오르는 느낌 */
 [data-testid="stVerticalBlockBorderWrapper"] { transition: border-color 0.25s ease, transform 0.25s ease; }
