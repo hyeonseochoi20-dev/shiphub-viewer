@@ -560,7 +560,7 @@ def ai_block_detail(block_id):
 def ai_similar_blocks(block_id):
     """메타데이터 기반 최근접 이웃 유사 블록 검색 (실제 3D 형상 임베딩 아님)"""
     try:
-        results = pdata.find_similar_blocks(block_id, request.args.get('top_k', 5))
+        results = pdata.find_similar_blocks(block_id, int(request.args.get('top_k', 5)))
         if results is None:
             return jsonify({"error": f"block_id={block_id} 를 찾을 수 없습니다"}), 404
         return jsonify({"method": "메타데이터 기반 최근접 이웃 (실제 3D 형상 임베딩 아님)", "results": results})

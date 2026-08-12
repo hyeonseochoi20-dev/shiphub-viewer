@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, Suspense } from 'react'
+import React, { useCallback, useEffect, useRef, useState, Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment, GizmoHelper, GizmoViewcube } from '@react-three/drei'
 import { FiRotateCw, FiChevronLeft, FiChevronRight, FiSliders, FiZap, FiInfo, FiUploadCloud, FiX, FiMenu } from 'react-icons/fi'
@@ -22,6 +22,7 @@ import DraftAnalysis from './components/DraftAnalysis'
 import SnapEngine from './components/SnapEngine'
 import ErectionSimulation, { erectionStageLabel } from './components/ErectionSimulation'
 import ViewJumper from './components/ViewJumper'
+import BlockFlyTo from './components/BlockFlyTo'
 import SavedViewsPanel from './components/SavedViewsPanel'
 import NoteTool from './components/NoteTool'
 import ToolsPanel from './components/ToolsPanel'
@@ -100,6 +101,15 @@ export default function App() {
   const controlsRef = useRef(null)
   const [savedViews, setSavedViews] = useState([])
   const [jumpTarget, setJumpTarget] = useState(null)
+  const [blockFlyRequest, setBlockFlyRequest] = useState(null)
+  const handleBlockFlyResolved = useCallback((target) => {
+    setJumpTarget(target)
+    setBlockFlyRequest(null)
+  }, [])
+  const flyToBlock = useCallback((block) => {
+    setMobileSheet(null) // 모바일에서는 바텀시트를 닫아서 뷰가 바로 보이게
+    setBlockFlyRequest(block)
+  }, [])
   const saveCurrentView = (name) => {
     if (!controlsRef.current) return
     const cam = controlsRef.current.object
@@ -263,6 +273,7 @@ export default function App() {
                 autoRotateSpeed={autoRotateSpeed}
               />
               <ViewJumper target={jumpTarget} controlsRef={controlsRef} onDone={() => setJumpTarget(null)} />
+              <BlockFlyTo requestBlock={blockFlyRequest} onResolve={handleBlockFlyResolved} />
 
               {/* key={selectedModel?.url} - 모델을 바꾸면 이 도구들이 캐시해둔 바운딩박스/길이축을 버리고 새로 계산하도록 강제 리마운트 */}
               {showGrid && (
@@ -351,7 +362,7 @@ export default function App() {
               if (isMobile) {
                 const sheets = {
                   tools: { label: '도구', icon: FiSliders, content: toolsPanelEl },
-                  ai: { label: 'AI', icon: FiZap, content: <AIQueryPanel forceOpen /> },
+                  ai: { label: 'AI', icon: FiZap, content: <AIQueryPanel forceOpen onFlyToBlock={flyToBlock} /> },
                   info: { label: '정보', icon: FiInfo, content: <div className="space-y-3">{infoStackEl}</div> },
                   batch: { label: '배치', icon: FiUploadCloud, content: <BatchPanel /> },
                 }
@@ -387,7 +398,7 @@ export default function App() {
                 <>
                   {/* 상태 패널 */}
                   <div className="absolute top-4 right-4 space-y-3">
-                    <AIQueryPanel />
+                    <AIQueryPanel onFlyToBlock={flyToBlock} />
                     {infoStackEl}
                   </div>
 

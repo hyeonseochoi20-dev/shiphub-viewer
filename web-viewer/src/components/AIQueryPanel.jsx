@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { FiSearch, FiZap, FiX, FiMessageCircle } from 'react-icons/fi'
+import { FiSearch, FiZap, FiX, FiMessageCircle, FiCrosshair } from 'react-icons/fi'
 import { API_BASE } from '../config'
 
 // MariaDB 생산 DB를 REST로 직접 조회하는 패널 (converter.py의 /api/ai/* 엔드포인트,
 // production_data.py 공용 로직 - mcp_server.py와 동일한 쿼리/모델을 로컬 HTTP로 노출)
-export default function AIQueryPanel({ forceOpen = false }) {
+export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState('faq') // 'faq' | 'query' | 'predict'
   const [filters, setFilters] = useState(null)
@@ -259,9 +259,16 @@ export default function AIQueryPanel({ forceOpen = false }) {
                   </span>
                 </div>
                 <div className="text-gray-500 mt-0.5">{r.ship_type} · {r.department} · QA {r.qa_status}</div>
-                <button onClick={() => findSimilar(r.block_id)} className="text-blue-400 hover:underline mt-1 text-[10px]">
-                  유사 블록 찾기
-                </button>
+                <div className="flex items-center gap-3 mt-1">
+                  <button onClick={() => findSimilar(r.block_id)} className="text-blue-400 hover:underline text-[10px]">
+                    유사 블록 찾기
+                  </button>
+                  {onFlyToBlock && (
+                    <button onClick={() => onFlyToBlock(r)} className="text-cyan-400 hover:underline text-[10px] flex items-center gap-1">
+                      <FiCrosshair className="w-2.5 h-2.5" /> 뷰로 이동
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -270,9 +277,16 @@ export default function AIQueryPanel({ forceOpen = false }) {
             <div className="mt-2 border-t border-gray-700 pt-2">
               <p className="text-[10px] text-gray-500 mb-1">{similar.method}</p>
               {similar.results.map((r) => (
-                <div key={r.block_id} className="text-[11px] text-gray-300 py-0.5 flex justify-between gap-2">
+                <div key={r.block_id} className="text-[11px] text-gray-300 py-0.5 flex items-center justify-between gap-2">
                   <span className="font-mono truncate">{r.block_name}</span>
-                  <span className="text-gray-500 shrink-0">거리 {r.similarity_distance}</span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <span className="text-gray-500">거리 {r.similarity_distance}</span>
+                    {onFlyToBlock && (
+                      <button onClick={() => onFlyToBlock(r)} className="text-cyan-400 hover:text-cyan-300" title="뷰로 이동">
+                        <FiCrosshair className="w-3 h-3" />
+                      </button>
+                    )}
+                  </span>
                 </div>
               ))}
             </div>
