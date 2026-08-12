@@ -1,0 +1,10 @@
+# Streamlit ML 대시보드(app.py) 전용 - 변환기(ifcopenshell/ezdxf/flask 등)는 제외해서
+# Render의 shiphub-dashboard 서비스 빌드 시간을 단축한다.
+numpy>=1.20.0
+pandas>=2.0.0
+scikit-learn>=1.4.0
+matplotlib>=3.7.0
+seaborn>=0.13.0
+streamlit>=1.40.0
+pymysql>=1.1.0
+sqlalchemy>=2.0.0
