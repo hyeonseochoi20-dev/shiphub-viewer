@@ -19,6 +19,7 @@ import ezdxf
 from pathlib import Path
 from datetime import datetime
 from flask import Flask, send_from_directory, jsonify, request
+from flask_cors import CORS
 from watchdog.observers.polling import PollingObserver as Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -27,6 +28,10 @@ import production_data as pdata
 sys.stdout.reconfigure(line_buffering=True)
 
 app = Flask(__name__)
+# 프론트(web-viewer)가 배포 환경에서는 다른 도메인(Vercel)에 떠있으므로 CORS 허용.
+# 이 API는 인증이 없는 포트폴리오용 공개 데모라 오리진을 넓게 허용해도 새로 노출되는
+# 권한은 없다(브라우저 CORS는 서버 접근 자체를 막지 않고 XHR/fetch의 same-origin만 완화한다).
+CORS(app)
 
 # 설정
 INPUT_DIR = Path("input_models")

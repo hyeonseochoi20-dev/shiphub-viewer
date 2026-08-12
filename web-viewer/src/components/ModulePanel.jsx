@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { FiCheckCircle, FiClock } from 'react-icons/fi'
+import { API_BASE } from '../config'
 
 const FALLBACK_MODULES = [
   { id: 'ifc', name: 'IFC (BIM)', engine: 'IfcOpenShell', status: 'active' },
@@ -15,7 +16,7 @@ export default function ModulePanel() {
   const [modules, setModules] = useState(FALLBACK_MODULES)
 
   useEffect(() => {
-    fetch('/api/modules')
+    fetch(`${API_BASE}/api/modules`)
       .then((res) => res.json())
       .then((data) => setModules(data))
       .catch(() => setModules(FALLBACK_MODULES))

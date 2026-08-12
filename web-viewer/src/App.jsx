@@ -13,6 +13,7 @@ import BatchPanel from './components/BatchPanel'
 import ModulePanel from './components/ModulePanel'
 import ShipGrid from './components/ShipGrid'
 import SectionPlane from './components/SectionPlane'
+import { STREAMLIT_URL } from './config'
 import MeasureTool from './components/MeasureTool'
 import ClashDetector from './components/ClashDetector'
 import RadiusTool from './components/RadiusTool'
@@ -174,7 +175,7 @@ export default function App() {
 
       {view === 'dashboard' && (
         <iframe
-          src="http://localhost:8501"
+          src={STREAMLIT_URL}
           title="생산관리 대시보드"
           className="flex-1 w-full border-0"
         />

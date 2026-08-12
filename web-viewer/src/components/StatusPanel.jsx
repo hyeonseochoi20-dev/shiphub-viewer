@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { API_BASE } from '../config'
 
 export default function StatusPanel() {
   const [stats, setStats] = useState({
@@ -11,7 +12,7 @@ export default function StatusPanel() {
     // 실시간 상태 가져오기
     const fetchStats = async () => {
       try {
-        const response = await fetch('/api/stats')
+        const response = await fetch(`${API_BASE}/api/stats`)
         const data = await response.json()
         setStats(data)
       } catch (error) {

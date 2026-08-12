@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { FiSearch, FiZap, FiX, FiMessageCircle } from 'react-icons/fi'
+import { API_BASE } from '../config'
 
 // MariaDB 생산 DB를 REST로 직접 조회하는 패널 (converter.py의 /api/ai/* 엔드포인트,
 // production_data.py 공용 로직 - mcp_server.py와 동일한 쿼리/모델을 로컬 HTTP로 노출)
@@ -25,7 +26,7 @@ export default function AIQueryPanel() {
 
   useEffect(() => {
     if (!open || filters) return
-    fetch('/api/ai/filters')
+    fetch(`${API_BASE}/api/ai/filters`)
       .then((r) => r.json())
       .then(setFilters)
       .catch(() => setError('필터 목록을 불러오지 못했습니다 (converter.py가 MariaDB에 연결되어 있는지 확인)'))
@@ -33,7 +34,7 @@ export default function AIQueryPanel() {
 
   useEffect(() => {
     if (!open || faq) return
-    fetch('/api/ai/faq')
+    fetch(`${API_BASE}/api/ai/faq`)
       .then((r) => r.json())
       .then(setFaq)
       .catch(() => setError('FAQ를 불러오지 못했습니다'))
@@ -60,7 +61,7 @@ export default function AIQueryPanel() {
       const params = new URLSearchParams()
       Object.entries(queryParams).forEach(([k, v]) => { if (v) params.set(k, v) })
       params.set('limit', '15')
-      const res = await fetch(`/api/ai/blocks?${params}`)
+      const res = await fetch(`${API_BASE}/api/ai/blocks?${params}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '조회 실패')
       setResults(data)
@@ -74,7 +75,7 @@ export default function AIQueryPanel() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/ai/blocks/${blockId}/similar?top_k=5`)
+      const res = await fetch(`${API_BASE}/api/ai/blocks/${blockId}/similar?top_k=5`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '조회 실패')
       setSimilar(data)
@@ -89,7 +90,7 @@ export default function AIQueryPanel() {
     setError(null)
     setPredictResult(null)
     try {
-      const res = await fetch('/api/ai/predict', {
+      const res = await fetch(`${API_BASE}/api/ai/predict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(predictForm),

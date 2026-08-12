@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { FiFile, FiRefreshCw } from 'react-icons/fi'
+import { API_BASE } from '../config'
 
 // 고품질 실사형 모델만 (PBR 텍스처 있는 Sketchfab CC-BY) - 저품질/단색 모델은 제외
 const FALLBACK_FILES = [
@@ -17,9 +18,11 @@ export default function FileTree({ onSelect }) {
   const fetchFiles = async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/models')
+      const response = await fetch(`${API_BASE}/api/models`)
       const data = await response.json()
-      setConverted(data)
+      // 백엔드가 돌려주는 url은 자기 자신(/models/...) 기준 상대경로라 API_BASE를 붙여줘야 함
+      // (FALLBACK_FILES의 /models/... 는 프론트에 정적으로 번들된 샘플이라 그대로 둠)
+      setConverted(data.map((f) => ({ ...f, url: f.url ? `${API_BASE}${f.url}` : f.url })))
     } catch (error) {
       console.error('Failed to fetch files:', error)
       setConverted([])

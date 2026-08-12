@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { FiFolder, FiEdit2, FiSave, FiX, FiFile, FiExternalLink, FiList } from 'react-icons/fi'
+import { API_BASE } from '../config'
 
 export default function BatchPanel() {
   const [queue, setQueue] = useState([])
@@ -18,7 +19,7 @@ export default function BatchPanel() {
   const [openError, setOpenError] = useState(null)
 
   const loadSettings = () => {
-    fetch('/api/settings')
+    fetch(`${API_BASE}/api/settings`)
       .then((res) => res.json())
       .then((data) => {
         setInputDir(data.input_dir)
@@ -31,7 +32,7 @@ export default function BatchPanel() {
 
   const fetchBatchStatus = async () => {
     try {
-      const res = await fetch('/api/batch-status')
+      const res = await fetch(`${API_BASE}/api/batch-status`)
       const data = await res.json()
       setQueue(data.items || [])
       setIsProcessing(!!data.running)
@@ -62,7 +63,7 @@ export default function BatchPanel() {
   const startBatch = async () => {
     setBatchError(null)
     try {
-      const res = await fetch('/api/batch-start', { method: 'POST' })
+      const res = await fetch(`${API_BASE}/api/batch-start`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '배치 변환을 시작할 수 없습니다')
       setQueue(data.items || [])
@@ -74,7 +75,7 @@ export default function BatchPanel() {
 
   const stopBatch = async () => {
     try {
-      const res = await fetch('/api/batch-stop', { method: 'POST' })
+      const res = await fetch(`${API_BASE}/api/batch-stop`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '정지할 수 없습니다')
     } catch (e) {
@@ -86,7 +87,7 @@ export default function BatchPanel() {
   const openInExplorer = async () => {
     setOpenError(null)
     try {
-      const res = await fetch('/api/open-folder', {
+      const res = await fetch(`${API_BASE}/api/open-folder`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dir: 'input' }),
@@ -102,7 +103,7 @@ export default function BatchPanel() {
     const next = !browsing
     setBrowsing(next)
     if (next) {
-      fetch('/api/browse?dir=input')
+      fetch(`${API_BASE}/api/browse?dir=input`)
         .then((res) => res.json())
         .then(setBrowseFiles)
         .catch(() => setBrowseFiles([]))
@@ -117,7 +118,7 @@ export default function BatchPanel() {
 
   const savePath = async () => {
     try {
-      const res = await fetch('/api/settings/input-dir', {
+      const res = await fetch(`${API_BASE}/api/settings/input-dir`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: pathDraft }),
