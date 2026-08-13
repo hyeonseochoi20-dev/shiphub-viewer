@@ -173,6 +173,49 @@
   a{ color:var(--cyan-soft); }
   a:focus-visible, button:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px; }
   ::selection{ background:var(--cyan); color:var(--paper); }
+
+  /* ---- 03 / TESSELLATION ---- */
+  .tess-board{ border:1px solid var(--line-strong); background:var(--paper-2); padding:30px; margin:30px 0 16px 0; display:grid; grid-template-columns:1fr 260px; gap:36px; align-items:center; }
+  @media (max-width:720px){ .tess-board{ grid-template-columns:1fr; } }
+  .tess-canvas-wrap{ display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .tess-canvas-wrap svg{ width:100%; max-width:280px; height:auto; }
+  .tess-readout{ font-family:var(--mono); text-align:center; }
+  .tess-readout .n{ font-size:30px; font-weight:700; color:var(--cyan-soft); font-variant-numeric:tabular-nums; }
+  .tess-readout .lbl{ font-size:12px; color:var(--ink-soft); margin-top:2px; letter-spacing:0.02em; }
+  .tess-controls{ display:flex; flex-direction:column; gap:18px; }
+  .tess-controls .row-label{ font-family:var(--mono); font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-soft); display:flex; justify-content:space-between; }
+  .tess-presets{ display:flex; gap:8px; flex-wrap:wrap; }
+  .tess-presets button{ font-family:var(--mono); font-size:11px; padding:6px 10px; background:var(--paper); border:1px solid var(--line-strong); color:var(--ink); cursor:pointer; transition:background 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+  .tess-presets button:hover{ border-color:var(--cyan); color:var(--cyan-soft); }
+  .tess-presets button.active{ background:var(--cyan); border-color:var(--cyan); color:var(--paper); }
+  .tess-note{ font-size:13px; line-height:1.7; color:var(--ink-soft); }
+
+  input[type=range]{ -webkit-appearance:none; appearance:none; width:100%; height:1px; background:var(--line-strong); outline:none; margin:10px 0; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:14px; height:14px; background:var(--cyan); border:2px solid var(--paper); box-shadow:0 0 0 1px var(--cyan); cursor:pointer; }
+  input[type=range]::-moz-range-thumb{ width:14px; height:14px; background:var(--cyan); border:2px solid var(--paper); box-shadow:0 0 0 1px var(--cyan); cursor:pointer; border-radius:0; }
+
+  .analogy-grid{ display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); margin:26px 0; }
+  @media (max-width:720px){ .analogy-grid{ grid-template-columns:1fr; } }
+  .analogy-card{ background:var(--paper); padding:22px 24px; }
+  .analogy-card .k{ font-family:var(--mono); font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--cyan-soft); margin-bottom:8px; }
+  .analogy-card p{ font-size:14px; line-height:1.75; color:var(--ink-soft); margin:0; }
+  .analogy-card strong{ color:var(--ink); }
+
+  /* ---- 04 / ROI calculator ---- */
+  .roi-panel{ border:1px solid var(--line-strong); background:var(--paper-2); padding:30px; margin:30px 0; }
+  .roi-sliders{ display:grid; grid-template-columns:1fr 1fr; gap:24px 40px; margin-bottom:8px; }
+  @media (max-width:720px){ .roi-sliders{ grid-template-columns:1fr; } }
+  .roi-slider .row-label{ font-family:var(--mono); font-size:11px; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-soft); display:flex; justify-content:space-between; }
+  .roi-slider .row-label b{ color:var(--cyan-soft); font-weight:600; }
+  .roi-hero{ margin-top:26px; padding:22px 24px; border:1px solid var(--cyan); background:color-mix(in srgb, var(--cyan) 8%, transparent); }
+  .roi-hero .k{ font-family:var(--mono); font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-soft); }
+  .roi-hero .v{ font-family:var(--display); font-size:clamp(28px,4vw,40px); font-weight:700; color:var(--cyan-soft); font-variant-numeric:tabular-nums; margin-top:4px; }
+  .roi-mini{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); margin-top:1px; }
+  @media (max-width:720px){ .roi-mini{ grid-template-columns:1fr; } }
+  .roi-mini div{ background:var(--paper); padding:16px 18px; }
+  .roi-mini .k{ font-family:var(--mono); font-size:10px; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-soft); }
+  .roi-mini .v{ font-family:var(--mono); font-size:18px; font-weight:600; color:var(--ink); margin-top:4px; font-variant-numeric:tabular-nums; }
+  .roi-caption{ font-size:12px; color:var(--ink-soft); margin-top:16px; line-height:1.7; }
 </style>
 
 <div class="progress" id="progress"></div>
@@ -238,32 +281,131 @@
   </section>
 
   <section class="reveal">
-    <div class="sec-head"><div class="num">03 / EVIDENCE</div><h2>파일럿 실측에서 전사 확산 추정까지</h2></div>
+    <div class="sec-head"><div class="num">03 / TESSELLATION</div><h2>삼각형 몇 개면 배로 보이는가</h2></div>
     <div class="sec-body">
       <div class="spacer"></div>
       <div>
         <p class="lede">
-          5개 부서 파일럿에서 실측한 세션당 절감액을 그대로 유지한 채, 조선소 전체 규모로 투영하면
-          연간 절감 규모는 수백억원 단위로 올라간다 — Streamlit 대시보드에서 인력 수·검토 빈도·라이선스
-          단가를 직접 조절하며 실시간으로 재계산해볼 수 있다.
+          컴퓨터 안에는 &lsquo;곡면&rsquo;이라는 게 원래 없다. 배 옆면처럼 매끄럽게 휜 강판도 화면에 그리려면
+          결국 아주 작은 평평한 삼각형을 수없이 이어 붙여서 흉내를 낸다 — 이 조각내기 작업을 그래픽스에서
+          <strong>테셀레이션(tessellation)</strong>이라 부르고, <code>triangle_count</code>는 정확히
+          &ldquo;몇 조각으로 쪼갰는가&rdquo;를 세는 숫자다. 슬라이더를 움직여서 같은 원이 삼각형 수에 따라
+          어떻게 달라 보이는지 직접 확인해보라.
         </p>
       </div>
     </div>
-    <div class="bom-wrap">
-      <table class="bom">
-        <tr><th>지표</th><th>범위</th><th>산출 방식</th></tr>
-        <tr><td>파일럿 실측 절감액</td><td class="cost">월 ~₩2백만</td><td>5개 부서 · 실측 세션당 단가 기준</td></tr>
-        <tr><td>전사 확산 연간 절감액(추정)</td><td class="cost">₩수백억</td><td>단가 × 엔지니어링 인력 × 일평균 검토 횟수</td></tr>
-        <tr><td>CAD 라이선스 회피 비용(1회성, 추정)</td><td class="cost">₩수백억</td><td>뷰어 전환 인원 × 라이선스 단가(최대 ~1억/카피)</td></tr>
-        <tr><td>지연일수 예측 R²</td><td class="cost">0.7 내외</td><td>RandomForestRegressor, 5선종·53척·14,000여 블록</td></tr>
-        <tr><td>지체상금 회피 가치(추정)</td><td class="cost">계약금액 × 0.13%/일</td><td>지자체 계약 시행규칙 법정 표준요율 × 실측 지연일수</td></tr>
-        <tr><td>QA 합격 예측 정확도</td><td class="cost">0.96 내외</td><td>RandomForestClassifier</td></tr>
-      </table>
+
+    <div class="tess-board">
+      <div class="tess-canvas-wrap">
+        <svg id="tessSvg" viewBox="0 0 220 220"></svg>
+        <div class="tess-readout">
+          <div class="n" id="tessN">28</div>
+          <div class="lbl" id="tessLbl">매끄러운 곡면처럼 보인다</div>
+        </div>
+      </div>
+      <div class="tess-controls">
+        <div>
+          <div class="row-label"><span>삼각형 수</span><span id="tessRangeLbl">28개</span></div>
+          <input type="range" id="tessRange" min="3" max="40" value="28" step="1">
+        </div>
+        <div class="tess-presets">
+          <button type="button" data-n="40">40 · 원본급</button>
+          <button type="button" data-n="12">12 · LOD 저사양</button>
+          <button type="button" data-n="6">6 · 각짐</button>
+          <button type="button" data-n="3">3 · 삼각형</button>
+        </div>
+        <p class="tess-note">
+          이 프로젝트 데이터셋의 <code>triangle_count</code>는 최소 507개부터 최대 3,602,657개까지
+          걸쳐 있다 — 원본 CAD는 용접 비드 하나까지 표현하려고 형상 하나에 수백만 개를 쓰지만, 뷰어는
+          이걸 1/10 수준으로 재테셀레이션해서 몇 초 만에 브라우저에서 열리게 만든다.
+        </p>
+      </div>
+    </div>
+
+    <div class="analogy-grid">
+      <div class="analogy-card">
+        <div class="k">게임 그래픽 옵션</div>
+        <p>
+          게임을 켤 때 만나는 &lsquo;매우 좋음 → 나쁨&rsquo; 그래픽 옵션과 원리가 완전히 같다. 옵션을
+          내리면 그래픽카드가 매 프레임 그려야 하는 폴리곤(삼각형) 수가 줄어서 화면은 각지고 단순해지지만
+          대신 훨씬 가볍게 돌아간다. 이 데이터셋의 <strong>lod_level(1~3)</strong> 컬럼이 정확히 그
+          슬라이더다 — 레벨이 낮을수록 삼각형을 더 적게 남긴 가벼운 버전이라는 뜻이다.
+        </p>
+      </div>
+      <div class="analogy-card">
+        <div class="k">거리 기반 LOD</div>
+        <p>
+          많은 게임 엔진이 카메라와의 거리에 따라 같은 캐릭터·건물의 고폴리곤/저폴리곤 버전을 미리 만들어두고
+          자동으로 바꿔 끼운다 — 멀리 있는 캐릭터는 어차피 점 하나 수준으로 찍히니 이목구비까지 그릴 필요가
+          없다(그래서 이름이 <strong>Level of Detail</strong>이다). ShipHub 뷰어는 거리 대신
+          &ldquo;지금 왜 열어보는가&rdquo;가 기준이다 — 훑어보는 용도면 저사양으로 충분하고, 정밀 검수라면
+          원본 수준이 필요하다.
+        </p>
+      </div>
     </div>
   </section>
 
   <section class="reveal">
-    <div class="sec-head"><div class="num">04 / DEMO</div><h2>실행 화면</h2></div>
+    <div class="sec-head"><div class="num">04 / EVIDENCE</div><h2>파일럿 실측에서 전사 확산 추정까지</h2></div>
+    <div class="sec-body">
+      <div class="spacer"></div>
+      <div>
+        <p class="lede">
+          5개 부서 파일럿에서 실측한 세션당 절감액(₩20,237)을 그대로 유지한 채, 조선소 전체 규모로
+          투영하면 연간 절감 규모는 수백억원 단위로 올라간다 — 아래 슬라이더를 직접 움직여서 인력 수·검토
+          빈도·라이선스 단가에 따라 실시간으로 재계산해보라.
+        </p>
+      </div>
+    </div>
+
+    <div class="roi-panel">
+      <div class="roi-sliders">
+        <div class="roi-slider">
+          <div class="row-label"><span>엔지니어링·생산관리 인력</span><b id="lblHeadcount">3,800명</b></div>
+          <input type="range" id="rngHeadcount" min="500" max="9640" value="3800" step="100">
+        </div>
+        <div class="roi-slider">
+          <div class="row-label"><span>1인당 일평균 검토 횟수</span><b id="lblReviews">2회</b></div>
+          <input type="range" id="rngReviews" min="1" max="5" value="2" step="1">
+        </div>
+        <div class="roi-slider">
+          <div class="row-label"><span>월 근무일수</span><b id="lblDays">22일</b></div>
+          <input type="range" id="rngDays" min="18" max="26" value="22" step="1">
+        </div>
+        <div class="roi-slider">
+          <div class="row-label"><span>중량 CAD 라이선스 5년 TCO(원/카피)</span><b id="lblLicense">8,000만원</b></div>
+          <input type="range" id="rngLicense" min="20000000" max="150000000" value="80000000" step="5000000">
+        </div>
+        <div class="roi-slider">
+          <div class="row-label"><span>풀 CAD → 경량 뷰어 대체 비율</span><b id="lblReplace">40%</b></div>
+          <input type="range" id="rngReplace" min="0" max="100" value="40" step="5">
+        </div>
+        <div class="roi-slider">
+          <div class="row-label"><span>조기 예측으로 방지 가능한 지연 비율</span><b id="lblPrevent">30%</b></div>
+          <input type="range" id="rngPrevent" min="0" max="100" value="30" step="5">
+        </div>
+      </div>
+
+      <div class="roi-hero">
+        <div class="k">연간 절감 + 라이선스 회피 합산</div>
+        <div class="v" id="roiHero">₩0</div>
+      </div>
+      <div class="roi-mini">
+        <div><div class="k">전사 연간 검토시간 절감액</div><div class="v" id="roiSaving">₩0</div></div>
+        <div><div class="k">회피된 CAD 라이선스 비용</div><div class="v" id="roiLicense">₩0</div></div>
+        <div><div class="k">지체상금 회피 가치</div><div class="v" id="roiPrevent">₩0</div></div>
+      </div>
+      <p class="roi-caption">
+        지체상금 회피 가치 산정 기준: 실측 53척 · 총 노출액 ₩53,017,845,759(계약금액 × 0.13%/일 × 실측
+        지연일수, 지방계약법 시행규칙 제75조 표준요율을 민간 조선 계약에 대리 지표로 차용). 요율 자체는
+        실제 법령이지만 &ldquo;민간 계약에도 유사 적용된다&rdquo;는 가정이 들어간 값이라는 점은 정직하게
+        밝혀둔다.
+      </p>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-head"><div class="num">05 / DEMO</div><h2>실행 화면</h2></div>
     <div class="sec-body">
       <div class="spacer"></div>
       <div><p class="lede">3D 뷰어와 Streamlit 대시보드 실제 조작 화면을 이 자리에 녹화본으로 교체하세요.</p></div>
@@ -276,7 +418,7 @@
   </section>
 
   <section class="reveal">
-    <div class="sec-head"><div class="num">05 / STACK</div><h2>구성 부품 명세</h2></div>
+    <div class="sec-head"><div class="num">06 / STACK</div><h2>구성 부품 명세</h2></div>
     <div class="sec-body">
       <div class="spacer"></div>
       <div><p class="lede">전부 무료·오픈소스. 상용 변환 엔진(HOOPS Exchange, ODA 등) 없이 동일한 문제를 풀었다.</p></div>
@@ -348,4 +490,118 @@
   }
   document.addEventListener('scroll', updateProgress, { passive: true });
   updateProgress();
+
+  // ---- 03 / TESSELLATION: 원을 N개 삼각형으로 부채꼴 삼각분할(fan triangulation)해서
+  // 테셀레이션 레벨에 따라 형상이 어떻게 뭉개지는지 실시간으로 보여준다.
+  (function(){
+    var svg = document.getElementById('tessSvg');
+    var nEl = document.getElementById('tessN');
+    var lblEl = document.getElementById('tessLbl');
+    var rangeLbl = document.getElementById('tessRangeLbl');
+    var range = document.getElementById('tessRange');
+    var presets = document.querySelectorAll('.tess-presets button');
+    var cx = 110, cy = 100, r = 78;
+
+    function labelFor(n){
+      if (n >= 28) return '매끄러운 곡면처럼 보인다';
+      if (n >= 14) return '거의 원처럼 보인다';
+      if (n >= 8) return '각이 지기 시작한다';
+      if (n >= 5) return '다각형이 뚜렷하다';
+      return '형체만 겨우 남는다';
+    }
+
+    function draw(n){
+      var svgns = 'http://www.w3.org/2000/svg';
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      var circle = document.createElementNS(svgns, 'circle');
+      circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', r);
+      circle.setAttribute('fill', 'none');
+      circle.setAttribute('stroke', 'var(--line-strong)');
+      circle.setAttribute('stroke-width', '1');
+      circle.setAttribute('stroke-dasharray', '3 3');
+      svg.appendChild(circle);
+
+      var pts = [];
+      for (var i = 0; i < n; i++){
+        var a = -Math.PI/2 + 2*Math.PI*i/n;
+        pts.push([cx + r*Math.cos(a), cy + r*Math.sin(a)]);
+      }
+      for (var j = 0; j < n; j++){
+        var p1 = pts[j], p2 = pts[(j+1) % n];
+        var tri = document.createElementNS(svgns, 'polygon');
+        tri.setAttribute('points', cx+','+cy+' '+p1[0].toFixed(1)+','+p1[1].toFixed(1)+' '+p2[0].toFixed(1)+','+p2[1].toFixed(1));
+        tri.setAttribute('fill', 'var(--cyan)');
+        tri.setAttribute('fill-opacity', '0.22');
+        tri.setAttribute('stroke', 'var(--cyan-soft)');
+        tri.setAttribute('stroke-width', '1');
+        svg.appendChild(tri);
+      }
+
+      nEl.textContent = n;
+      lblEl.textContent = labelFor(n);
+      rangeLbl.textContent = n + '개';
+      range.value = n;
+      presets.forEach(function(btn){ btn.classList.toggle('active', parseInt(btn.getAttribute('data-n'), 10) === n); });
+    }
+
+    range.addEventListener('input', function(){ draw(parseInt(range.value, 10)); });
+    presets.forEach(function(btn){
+      btn.addEventListener('click', function(){ draw(parseInt(btn.getAttribute('data-n'), 10)); });
+    });
+    draw(28);
+  })();
+
+  // ---- 04 / EVIDENCE: ROI 계산기. Streamlit 대시보드(app.py)의 동일한 계산 로직을 그대로
+  // JS로 옮긴 것 - 기준값(세션당 절감액, 지체상금 노출액 등)은 실제 MariaDB 실측치를 고정값으로 박아넣었다
+  // (이 페이지는 정적 HTML이라 매 요청마다 DB를 조회하지 않는다. 최신 실측치가 필요하면 Streamlit
+  // 대시보드의 "1. 데이터 정의" 탭을 참고할 것).
+  (function(){
+    var AVG_COST_PER_SESSION = 20236.64; // 5개 부서 파일럿 실측, 2026-08 기준 월 세션당 절감액
+    var TOTAL_EXPOSURE = 53017845759;    // 53척 지체상금 노출액 합계(계약금액 × 0.13%/일 × 실측 지연일수)
+
+    var fmtKRW = function(v){ return '₩' + Math.round(v).toLocaleString('ko-KR'); };
+
+    var els = {
+      headcount: document.getElementById('rngHeadcount'), lblHeadcount: document.getElementById('lblHeadcount'),
+      reviews: document.getElementById('rngReviews'), lblReviews: document.getElementById('lblReviews'),
+      days: document.getElementById('rngDays'), lblDays: document.getElementById('lblDays'),
+      license: document.getElementById('rngLicense'), lblLicense: document.getElementById('lblLicense'),
+      replace: document.getElementById('rngReplace'), lblReplace: document.getElementById('lblReplace'),
+      prevent: document.getElementById('rngPrevent'), lblPrevent: document.getElementById('lblPrevent'),
+    };
+    if (!els.headcount) return; // 이 섹션이 없는 페이지에서는 조용히 스킵
+
+    function recompute(){
+      var headcount = parseInt(els.headcount.value, 10);
+      var reviews = parseInt(els.reviews.value, 10);
+      var days = parseInt(els.days.value, 10);
+      var license = parseInt(els.license.value, 10);
+      var replaceRatio = parseInt(els.replace.value, 10);
+      var preventRatio = parseInt(els.prevent.value, 10);
+
+      els.lblHeadcount.textContent = headcount.toLocaleString('ko-KR') + '명';
+      els.lblReviews.textContent = reviews + '회';
+      els.lblDays.textContent = days + '일';
+      els.lblLicense.textContent = Math.round(license/10000).toLocaleString('ko-KR') + '만원';
+      els.lblReplace.textContent = replaceRatio + '%';
+      els.lblPrevent.textContent = preventRatio + '%';
+
+      var sessions = headcount * reviews * days;
+      var monthlySaving = sessions * AVG_COST_PER_SESSION;
+      var annualSaving = monthlySaving * 12;
+      var licenseAvoided = headcount * (replaceRatio/100) * license;
+      var preventedValue = TOTAL_EXPOSURE * (preventRatio/100);
+
+      document.getElementById('roiHero').textContent = fmtKRW(annualSaving + licenseAvoided);
+      document.getElementById('roiSaving').textContent = fmtKRW(annualSaving);
+      document.getElementById('roiLicense').textContent = fmtKRW(licenseAvoided);
+      document.getElementById('roiPrevent').textContent = fmtKRW(preventedValue);
+    }
+
+    Object.keys(els).forEach(function(k){
+      if (k.indexOf('lbl') === 0) return;
+      els[k].addEventListener('input', recompute);
+    });
+    recompute();
+  })();
 </script>
