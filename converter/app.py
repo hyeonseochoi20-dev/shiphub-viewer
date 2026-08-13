@@ -377,19 +377,21 @@ def load_roi():
 @st.cache_resource(show_spinner="회귀 모델 4종 학습 중...")
 def train_regression_models(X_full, y_delay):
     """st.tabs()는 보이는 탭과 무관하게 스크립트 전체가 매번 재실행되므로, 캐싱 없이는
-    사이드바 필터를 하나만 건드려도 RandomForest(200그루) 포함 4개 모델이 매번 처음부터
+    사이드바 필터를 하나만 건드려도 RandomForest 포함 4개 모델이 매번 처음부터
     재학습됐다(실측 약 100초+). X_full/y_delay 내용이 실제로 바뀔 때만 재학습되도록 캐싱한다.
 
-    n_jobs=1(단일 스레드): joblib이 n_jobs=-1로 워커 프로세스를 fork하면 워커마다 학습
-    데이터를 복제해서 메모리를 배로 먹는다 - Render 무료 티어(512MB) OOM으로 "Oh no. Error
-    running app"가 떴던 원인. production_data.py의 동일 이슈 수정과 같은 처방."""
+    n_jobs=1(단일 스레드) + n_estimators=80 + max_depth=12: joblib이 n_jobs=-1로 워커
+    프로세스를 fork하면 워커마다 학습 데이터를 복제해서 메모리를 배로 먹고, 트리 개수·깊이
+    제한이 없으면 단일 스레드라도 트리 구조 자체가 메모리를 많이 먹는다 - Render 무료
+    티어(512MB) OOM으로 "Oh no. Error running app"가 떴던 원인. production_data.py의
+    동일 이슈 수정과 같은 처방(정확도 손실은 미미하고 EDA 결론에 영향 없음)."""
     X_train, X_test, y_train, y_test = train_test_split(X_full, y_delay, test_size=0.2, random_state=0)
     models = {
         "LinearRegression": LinearRegression(),
         "Ridge(alpha=1.0)": Ridge(alpha=1.0),
         "Lasso(alpha=0.1)": Lasso(alpha=0.1),
         "ElasticNet(alpha=0.1)": ElasticNet(alpha=0.1, l1_ratio=0.5),
-        "RandomForestRegressor": RandomForestRegressor(n_estimators=200, random_state=0, n_jobs=1),
+        "RandomForestRegressor": RandomForestRegressor(n_estimators=80, max_depth=12, random_state=0, n_jobs=1),
     }
     results = []
     fitted = {}
@@ -412,7 +414,7 @@ def train_classification_models(X_full, y_qa):
     Xc_train, Xc_test, yc_train, yc_test = train_test_split(X_full, y_qa, test_size=0.2, random_state=0)
     models = {
         "LogisticRegression": LogisticRegression(max_iter=1000),
-        "RandomForestClassifier": RandomForestClassifier(n_estimators=200, random_state=0, n_jobs=1),
+        "RandomForestClassifier": RandomForestClassifier(n_estimators=80, max_depth=12, random_state=0, n_jobs=1),
     }
     results = []
     fitted = {}
@@ -1102,7 +1104,7 @@ models = {
     'Ridge': Ridge(alpha=1.0),          # L2 규제 - 계수를 0에 가깝게 축소
     'Lasso': Lasso(alpha=0.1),          # L1 규제 - 불필요한 계수를 정확히 0으로 (자동 피처 선택 효과)
     'ElasticNet': ElasticNet(alpha=0.1, l1_ratio=0.5),  # L1+L2 절충
-    'RandomForestRegressor': RandomForestRegressor(n_estimators=200, random_state=0, n_jobs=-1),
+    'RandomForestRegressor': RandomForestRegressor(n_estimators=80, max_depth=12, random_state=0, n_jobs=1),  # 무료 호스팅 메모리 제한 대응
 }
 for name, model in models.items():
     model.fit(X_train, y_train)
@@ -1247,7 +1249,7 @@ grid.fit(X_train, y_train)
                 f"각각 3-fold 교차검증(cv=3, 데이터를 3등분해서 번갈아 검증)으로 27×3=81번 학습·평가해 "
                 f"R²가 가장 높은 조합을 자동으로 골랐다.\n\n"
                 + (f"R²가 기본 대비 **{r2_gain:+.3f}** 개선됐다 — "
-                   f"기본 RandomForest(`n_estimators=200`, 깊이 제한 없음)가 이미 최적에 가까웠거나, "
+                   f"기본 RandomForest(`n_estimators=80`, `max_depth=12`)가 이미 최적에 가까웠거나, "
                    f"이 데이터 규모에서는 하이퍼파라미터보다 피처 자체(어떤 변수를 쓰는지)가 성능을 더 좌우한다는 뜻일 수 있다."
                    if abs(r2_gain) < 0.01 else
                    (f"R²가 기본 대비 **{r2_gain:+.3f}** 개선됐다 — 트리 깊이·분기 조건을 제한해서 훈련 데이터에 대한 과적합을 줄인 결과로 해석할 수 있다."
