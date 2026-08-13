@@ -51,15 +51,35 @@ DEPT_STAGES = {
     "자동화솔루션": ["절단", "조립", "탑재"],
 }
 
-# 공정단계별 지연 경향 (하류 공정일수록 상류 트레이드 대기·외부요인 영향이 커짐 - 도장/시운전은
-# 기상·선행공정 지연에 취약, 절단/조립은 예측 가능한 정형 작업이라 지연폭이 작음)
-STAGE_DELAY_FACTOR = {"절단": -0.3, "조립": -0.1, "탑재": 0.2, "의장": 0.3, "도장": 0.6, "시운전": 0.9}
-# 부서별 지연 경향 (자동화솔루션은 아직 전 공정 롤아웃이 끝나지 않아 수작업 병행 구간에서
-# 산발적 지연이 발생 - 완전 원인은 아니지만 약한 상관관계로 반영)
-DEPT_DELAY_FACTOR = {
-    "생산관리(가공/건조)": 0.0, "생산관리(의장)": 0.1, "품질(의장품질관리)": -0.2,
-    "기본설계": -0.1, "자동화솔루션": 0.7,
+# 공정단계 특성 - 지연을 '상수 오프셋'으로 주는 대신, 지연이 실제로 발생하는 세 가지 경로의
+# 민감도로 표현한다. 부서는 지연의 직접 원인이 아니다(부서가 느려서 늦는 게 아니라, 그 부서가
+# 맡은 공정이 어떤 성격이냐에 따라 늦는다) - 그래서 부서별 상수는 아예 두지 않고,
+# DEPT_STAGES를 통해 간접적으로만 드러나게 한다.
+#   congestion: 야드 자원(크레인·도크·인력) 경합에 얼마나 노출되는가
+#   weather   : 옥외 작업 비중 - 혹한기/장마철에 얼마나 밀리는가
+#   rework    : QA 결함 1건이 재작업으로 이어질 때 걸리는 시간 배수
+STAGE_PROFILE = {
+    "절단":   {"congestion": 0.6, "weather": 0.0, "rework": 0.5},
+    "조립":   {"congestion": 0.9, "weather": 0.1, "rework": 0.9},
+    "탑재":   {"congestion": 1.4, "weather": 0.4, "rework": 1.0},
+    "의장":   {"congestion": 1.2, "weather": 0.2, "rework": 1.3},
+    "도장":   {"congestion": 0.7, "weather": 1.0, "rework": 0.8},
+    "시운전": {"congestion": 1.0, "weather": 0.6, "rework": 1.5},
 }
+
+# 우선순위는 '작업 속도'가 아니라 '대기열 순번'에만 작용한다 - 우선순위를 높인다고 용접이
+# 빨라지지는 않고, 크레인·도크를 먼저 잡을 뿐이다. 그래서 상수 덧셈이 아니라 대기시간에
+# 곱해지는 배수로 들어가고, 결과적으로 "혼잡할 때만 우선순위가 의미 있다"는 상호작용이 생긴다.
+PRIORITY_WAIT_MULT = {"High": 0.35, "Medium": 1.0, "Low": 1.55}
+
+
+def season_factor(month):
+    """혹한기(12~2월) 도장 품질 이슈·장마철(6~7월) 옥외작업 중단을 반영한 계절 가중치."""
+    if month in (12, 1, 2):
+        return 1.0
+    if month in (6, 7):
+        return 0.8
+    return 0.25
 
 
 def init_table(conn):
@@ -102,12 +122,19 @@ def generate(seed=42):
             vessel_id = f"{ship_type.split('(')[0]}-{v:02d}"
             n_blocks = int(rng.integers(blk_lo, blk_hi + 1))
 
+            # 같은 척·같은 공정의 블록들은 같은 크레인·도크·인력을 두고 경쟁하므로 지연이 함께
+            # 움직인다. 이 '야드 혼잡도'는 데이터셋 컬럼에 없는 잠재 변수라 회귀가 설명할 수 없는
+            # 몫으로 남는다 - 실제 현장 데이터에서도 이런 그룹 효과가 잔차의 큰 부분을 차지하고,
+            # 이것 때문에 R²가 1에 가까워질 수 없다.
+            yard_load = {s: float(rng.lognormal(0.0, 0.42)) for s in STAGES}
+
             for _ in range(n_blocks):
                 block_seq += 1
                 block_name = f"{vessel_id}-{random.choice(BLOCK_PREFIXES)}{block_seq:05d}"
                 dept = random.choice(DEPARTMENTS)
                 stage = random.choice(DEPT_STAGES[dept])
                 priority = random.choices(PRIORITIES, weights=[0.2, 0.5, 0.3])[0]
+                prof = STAGE_PROFILE[stage]
 
                 # 형상 복잡도 (실제 변환 파이프라인의 triangle_count를 흉내낸 가상값) - 선종별 배율 적용
                 triangle_count = int(rng.lognormal(mean=10, sigma=1.1) * complexity_mult)
@@ -116,33 +143,43 @@ def generate(seed=42):
 
                 planned_days = max(3, int(rng.normal(14, 4)))
 
-                # 복잡도가 높을수록 지연 증가, 우선순위 높으면 지연 감소 (+ 공정단계/부서의 약한 영향)
-                complexity_factor = triangle_count / 100000
-                # 우선순위 효과 자체에도 레코드별 지터를 줘서 "우선순위 = 정확히 이 상수"인
-                # 깨끗한 계단식 관계가 되지 않게 한다 (현실에서는 같은 우선순위라도 담당자·
-                # 협력사 사정에 따라 실제 효과가 들쭉날쭉하다)
-                priority_base = {"High": -0.9, "Medium": 0.0, "Low": 0.9}[priority]
-                priority_factor = priority_base + rng.normal(0, 0.4)
-                stage_factor = STAGE_DELAY_FACTOR[stage]
-                dept_factor = DEPT_DELAY_FACTOR[dept]
-                # 노이즈 표준편차를 체계적 요인들의 합보다 크게 잡아, 회귀모델이 생성식을
-                # 그대로 역산하지 못하고 "부분적으로만 설명 가능한" 현실적인 관계가 되게 한다
-                delay_days = round(
-                    complexity_factor * 3 + priority_factor + stage_factor + dept_factor
-                    + rng.normal(0, 3.0),
-                    1,
-                )
-                delay_days = max(-6.0, delay_days)
-                actual_days = round(planned_days + delay_days)
-
-                # 복잡도가 높을수록 QA 결함 수 증가
-                qa_defect_count = max(0, int(rng.normal(complexity_factor * 4, 2)))
-                qa_status = "불합격" if qa_defect_count > 5 else "합격"
-
                 # 최근 180일에 걸쳐 분산 - 요일/월별 분석(datetime 전처리 실습)이 의미를 가지려면
                 # 전 레코드가 동일 시각이어서는 안 됨
                 days_ago = int(rng.integers(0, 180))
-                created_at = (datetime.now() - timedelta(days=days_ago, hours=int(rng.integers(0, 24)))).isoformat()
+                created_dt = datetime.now() - timedelta(days=days_ago, hours=int(rng.integers(0, 24)))
+                created_at = created_dt.isoformat()
+
+                # --- (1) QA 결함: 복잡한 형상일수록 결함이 늘지만 선형이 아니라 로그로 포화한다
+                # (2배 복잡하다고 결함이 2배가 되지는 않는다). 카운트 변수이므로 푸아송.
+                defect_rate = 0.8 + 5.2 * np.log10(triangle_count / 20000 + 1)
+                qa_defect_count = int(rng.poisson(defect_rate))
+                qa_status = "불합격" if qa_defect_count > 5 else "합격"
+
+                # --- (2) 재작업: 결함이 나야 비로소 다시 손을 댄다. 결함 1건당 소요가 지수분포라
+                # 몇 건만 겹쳐도 꼬리가 길어진다(복합 푸아송).
+                rework_days = float(
+                    sum(rng.exponential(0.7) for _ in range(qa_defect_count))
+                ) * prof["rework"]
+
+                # --- (3) 대기: 야드가 혼잡할수록 늘고, 우선순위는 여기에만 작용한다.
+                wait_days = (
+                    prof["congestion"] * yard_load[stage]
+                    * PRIORITY_WAIT_MULT[priority] * float(rng.exponential(1.0))
+                )
+
+                # --- (4) 기상: 옥외 비중이 큰 공정만, 그것도 계절을 탄다.
+                weather_days = (
+                    prof["weather"] * season_factor(created_dt.month)
+                    * float(rng.exponential(1.2))
+                )
+
+                # --- (5) 계획에 잡아둔 여유: 대부분의 지연은 여기서 흡수되고, 남는 것만 실제
+                # 지연으로 드러난다. 여유가 넉넉하면 조기 완료(음수)도 나온다.
+                slack_days = float(rng.normal(1.3, planned_days * 0.10))
+
+                delay_days = round(rework_days + wait_days + weather_days - slack_days, 1)
+                delay_days = max(-6.0, delay_days)
+                actual_days = max(1, round(planned_days + delay_days))
 
                 # 실제 현장 데이터처럼 일부 결측치를 의도적으로 섞음(전처리 실습용):
                 # QA 결함수 - 아직 미검수라 값이 없는 경우 / 파일 크기 - 변환 로그 유실로 기록 누락된 경우
