@@ -58,6 +58,28 @@ PRIORITIES = ["High", "Medium", "Low"]
 BLOCK_PREFIXES = ["B", "E", "S"]
 REVIEW_TYPES = ["설계검토", "간섭검사", "공정검토", "QA검수", "협력사공유"]
 
+# 부서가 실제로 관여하는 공정단계만 허용 (기본설계는 절단/조립 착수 전 설계검토 단계까지만 관여,
+# 생산관리(가공/건조)는 선체 조립 단계, 생산관리(의장)/품질은 의장 이후 단계, 자동화솔루션은
+# 스캔·로봇용접 자동화가 실제 배치된 선체 가공 단계에서만 개입 - 이미 지나간 절단 단계에
+# 자동화솔루션팀이나 도장 단계에 기본설계팀이 붙는 등의 비현실적 조합을 막는다)
+DEPT_STAGES = {
+    "생산관리(가공/건조)": ["절단", "조립", "탑재"],
+    "생산관리(의장)": ["의장", "도장", "시운전"],
+    "품질(의장품질관리)": ["의장", "도장", "시운전"],
+    "기본설계": ["절단", "조립"],
+    "자동화솔루션": ["절단", "조립", "탑재"],
+}
+
+# 공정단계별 지연 경향 (하류 공정일수록 상류 트레이드 대기·외부요인 영향이 커짐 - 도장/시운전은
+# 기상·선행공정 지연에 취약, 절단/조립은 예측 가능한 정형 작업이라 지연폭이 작음)
+STAGE_DELAY_FACTOR = {"절단": -0.3, "조립": -0.1, "탑재": 0.2, "의장": 0.3, "도장": 0.6, "시운전": 0.9}
+# 부서별 지연 경향 (자동화솔루션은 아직 전 공정 롤아웃이 끝나지 않아 수작업 병행 구간에서
+# 산발적 지연이 발생 - 완전 원인은 아니지만 약한 상관관계로 반영)
+DEPT_DELAY_FACTOR = {
+    "생산관리(가공/건조)": 0.0, "생산관리(의장)": 0.1, "품질(의장품질관리)": -0.2,
+    "기본설계": -0.1, "자동화솔루션": 0.7,
+}
+
 # ROI 램프업(온보딩 시점, 정상 가동까지 개월수) - generate_roi_data.py와 동일 스토리
 ROI_MONTHS = 6
 RAMP = [0.30, 0.52, 0.70, 0.85, 0.95, 1.0]
@@ -138,8 +160,8 @@ def main(seed=42):
                     for _ in range(n_blocks):
                         block_seq += 1
                         block_name = f"{vessel_code}-{random.choice(BLOCK_PREFIXES)}{block_seq:05d}"
-                        stage = random.choice(STAGES)
                         dept = random.choice(list(dept_ids.keys()))
+                        stage = random.choice(DEPT_STAGES[dept])
                         priority = random.choices(PRIORITIES, weights=[0.2, 0.5, 0.3])[0]
 
                         triangle_count = int(rng.lognormal(mean=10, sigma=1.1) * mult)
@@ -148,9 +170,17 @@ def main(seed=42):
                         planned_days = max(3, int(rng.normal(14, 4)))
 
                         complexity_factor = triangle_count / 100000
-                        priority_factor = {"High": -1.5, "Medium": 0.0, "Low": 1.5}[priority]
-                        delay_days = round(complexity_factor * 3 + priority_factor + rng.normal(0, 1.5), 1)
-                        delay_days = max(-3.0, delay_days)
+                        priority_factor = {"High": -1.2, "Medium": 0.0, "Low": 1.2}[priority]
+                        stage_factor = STAGE_DELAY_FACTOR[stage]
+                        dept_factor = DEPT_DELAY_FACTOR[dept]
+                        # 노이즈 표준편차를 체계적 요인들의 합과 비슷한 크기로 잡아, 회귀모델이
+                        # 생성식을 그대로 역산하지 않고 "부분적으로만 설명 가능한" 현실적인 관계가 되게 한다
+                        delay_days = round(
+                            complexity_factor * 3 + priority_factor + stage_factor + dept_factor
+                            + rng.normal(0, 2.2),
+                            1,
+                        )
+                        delay_days = max(-6.0, delay_days)
                         actual_days = round(planned_days + delay_days)
 
                         qa_defect_count = max(0, int(rng.normal(complexity_factor * 4, 2)))
