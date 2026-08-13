@@ -845,6 +845,7 @@ with tab4:
                 ax_h.set_title(col_name, fontsize=10)
                 ax_h.set_xlabel("")
                 st.pyplot(fig_h)
+                plt.close(fig_h)
 
     delay_skew = fdf["delay_days"].skew()
     tri_skew = fdf["triangle_count"].skew()
@@ -888,6 +889,7 @@ with tab4:
     fig, ax = plt.subplots(figsize=(7, 5))
     sns.heatmap(corr, annot=True, fmt=".2f", cmap="RdBu_r", vmin=-1, vmax=1, ax=ax)
     st.pyplot(fig)
+    plt.close(fig)
 
     delay_corr = corr["delay_days"].drop("delay_days").sort_values(key=abs, ascending=False)
     top_delay_var, top_delay_val = delay_corr.index[0], delay_corr.iloc[0]
@@ -919,6 +921,7 @@ with tab4:
         fig2, ax2 = plt.subplots(figsize=(5, 4))
         sns.boxplot(x="priority", y="delay_days", data=fdf, order=["High", "Medium", "Low"], ax=ax2)
         st.pyplot(fig2)
+        plt.close(fig2)
         med_high = fdf[fdf["priority"] == "High"]["delay_days"].median()
         med_low = fdf[fdf["priority"] == "Low"]["delay_days"].median()
         st.caption(
