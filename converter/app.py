@@ -175,51 +175,6 @@ ERD_SVG_BARKER = """
 """
 
 
-def _tessellation_wedge_svg(n_sides, cx, cy, r, color):
-    """중심에서 부채꼴로 펼친 N각형(fan triangulation) - 3D 그래픽스에서 실제로 곡면을
-    삼각형으로 쪼개는 가장 기본적인 방식과 동일한 원리다. 점선 원은 근사하려는 '진짜' 곡면이고,
-    N(삼각형 수)이 작아질수록 그 곡면에서 점점 멀어져 각지고 뭉툭해지는 걸 보여준다."""
-    import math
-    pts = [
-        (cx + r * math.cos(-math.pi / 2 + 2 * math.pi * i / n_sides),
-         cy + r * math.sin(-math.pi / 2 + 2 * math.pi * i / n_sides))
-        for i in range(n_sides)
-    ]
-    tris = [
-        f'<polygon points="{cx},{cy} {pts[i][0]:.1f},{pts[i][1]:.1f} {pts[(i+1) % n_sides][0]:.1f},{pts[(i+1) % n_sides][1]:.1f}" '
-        f'fill="{color}" fill-opacity="0.3" stroke="{color}" stroke-width="1.2"/>'
-        for i in range(n_sides)
-    ]
-    circle = f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="#6b7280" stroke-width="1" stroke-dasharray="3 3"/>'
-    return circle + "\n" + "\n".join(tris)
-
-
-def _tessellation_panel(n_sides, cx, title, subtitle, color):
-    return f"""
-<g>
-  <text x="{cx}" y="24" text-anchor="middle" font-size="13" font-weight="700" fill="#e5e7eb">{title}</text>
-  {_tessellation_wedge_svg(n_sides, cx, 95, 55, color)}
-  <text x="{cx}" y="172" text-anchor="middle" font-size="11" fill="#9ca3af">{subtitle}</text>
-</g>"""
-
-
-# 테셀레이션(곡면을 삼각형으로 쪼개는 것) 레벨에 따라 같은 형상이 어떻게 달라 보이는지 3단계로
-# 나란히 비교하는 삽화 - 프로젝트 소개 탭에서 "triangle_count가 왜 형상 복잡도 지표인지"를
-# CAD/그래픽스를 모르는 사람도 한눈에 이해하게 하기 위한 것. ERD_SVG_BARKER와 동일하게
-# 외부 이미지 없이 순수 인라인 SVG로 그린다(배포 환경 의존성 없음).
-TESSELLATION_SVG = f"""
-<div style="border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:20px;background:rgba(255,255,255,0.02);overflow-x:auto;">
-<svg viewBox="0 0 660 190" style="width:100%;height:auto;min-width:520px;font-family:inherit;">
-  {_tessellation_panel(28, 110, "삼각형 28개", "매끄러운 곡면처럼 보인다", "#4ade80")}
-  {_tessellation_panel(8, 330, "삼각형 8개", "각이 지기 시작한다", "#facc15")}
-  {_tessellation_panel(4, 550, "삼각형 4개", "마름모 - 형체만 겨우 남는다", "#f87171")}
-</svg>
-</div>
-"""
-
-
-DEV_COST_KRW = 15_000_000  # 1인 개발 약 3개월 파트타임 투입 공수 추정치
-
 CUSTOM_CSS = """
 <style>
 html, body, [class*="css"] {
@@ -290,24 +245,6 @@ html, body, [class*="css"] {
 [data-testid="stMetricLabel"] { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: #8b8b93 !important; font-weight: 600; }
 [data-testid="stMetricValue"] { font-size: 1.45rem; font-weight: 700; color: #f4f4f5; animation: metricPop 0.5s cubic-bezier(.2,.8,.3,1); }
 
-/* 히어로 메트릭 - 카드당 가장 중요한 숫자 하나만 훨씬 크게, 나머지는 보조 정보로 */
-.hero-metric-wrap {
-    display: flex; align-items: baseline; gap: 14px; margin: 2px 0 18px 0;
-    padding: 20px 24px; border-radius: 14px;
-    background: linear-gradient(135deg, rgba(59,130,246,0.13), rgba(59,130,246,0.02));
-    border: 1px solid rgba(59,130,246,0.28);
-    animation: metricGlow 0.9s ease-out;
-}
-.hero-metric-label { font-size: 0.76rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: #8b8b93; }
-.hero-metric-value {
-    font-size: clamp(2rem, 4vw, 2.7rem); font-weight: 800; letter-spacing: -0.02em; line-height: 1.15;
-    background: linear-gradient(135deg, #60a5fa, #a5d8ff 65%, #e0f2fe);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    animation: metricPop 0.55s cubic-bezier(.2,.8,.3,1);
-    font-variant-numeric: tabular-nums;
-}
-.hero-metric-sub { font-size: 0.8rem; color: #8b8b93; margin-top: 4px; }
-
 /* 탭 */
 [data-testid="stTabs"] button[role="tab"] { font-weight: 600; font-size: 0.87rem; color: #8b8b93; }
 [data-testid="stTabs"] button[aria-selected="true"] p { color: #f4f4f5 !important; }
@@ -355,17 +292,6 @@ def section(num, title, subtitle=None):
     )
 
 
-def hero_metric(label, value, sub=None):
-    """카드 안에서 가장 강조하고 싶은 숫자 하나를 큼직하게 - 리렌더될 때마다 pop 애니메이션 재생"""
-    sub_html = f'<div class="hero-metric-sub">{sub}</div>' if sub else ""
-    st.markdown(
-        f'<div class="hero-metric-wrap"><div>'
-        f'<div class="hero-metric-label">{label}</div>'
-        f'<div class="hero-metric-value">{value}</div>'
-        f"{sub_html}</div></div>",
-        unsafe_allow_html=True,
-    )
-
 
 # ---------------------------------------------------------------------------
 # 2. 데이터 준비 - MariaDB 정규화 스키마(dim_*/fact_*)를 JOIN하는 뷰에서 조회
@@ -412,28 +338,6 @@ def load_data():
             pass
     st.session_state["data_source"] = "로컬 CSV 스냅샷 (data/production_records.csv)"
     return pd.read_csv(DATA_DIR / "production_records.csv")
-
-
-@st.cache_data
-def load_roi():
-    """3D 뷰어 경량화 변환(glTF+LOD)이 실제로 절감하는 부서별 리뷰 로딩 시간/비용 - 6개월 온보딩 램프업 시계열
-    (load_data와 동일하게 DB 미설정/접속 실패 시 로컬 CSV로 대체)"""
-    if HAS_DB_CONFIG:
-        try:
-            with engine.connect() as conn:
-                return pd.read_sql(sa.text(
-                    "SELECT session_id AS id, department, month, review_type, triangle_count, "
-                    "traditional_load_min, lightweight_load_sec, cost_saved_krw FROM v_review_sessions;"
-                ), conn)
-        except Exception:
-            pass
-    try:
-        df = pd.read_csv(DATA_DIR / "review_sessions.csv")
-        df = df.rename(columns={"session_id": "id"})
-        return df[["id", "department", "month", "review_type", "triangle_count",
-                   "traditional_load_min", "lightweight_load_sec", "cost_saved_krw"]]
-    except FileNotFoundError:
-        return pd.DataFrame()
 
 
 @st.cache_resource(show_spinner="회귀 모델 4종 학습 중...")
@@ -496,7 +400,6 @@ def train_classification_models(X_full, y_qa):
 # 사이드바 - 필터 + 새로고침 (교안 20p 매출 대시보드 패턴)
 # ---------------------------------------------------------------------------
 raw_df = load_data()
-roi_df = load_roi()
 
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
@@ -559,49 +462,6 @@ if active_section == SECTIONS[0]:
 왜 이 주제인가: `ShipHub Viewer`(개인 개발 중인 조선 3D 뷰어 변환 파이프라인)가 매 변환마다 형상 복잡도
 메타데이터를 실제로 축적하고 있어, 그 파이프라인의 실사용 출력 구조를 그대로 정규화 스키마로 삼고
 동일한 통계적 특성(형상이 복잡할수록 공정 지연·QA 결함이 늘어나는 상관관계)을 갖는 데이터로 프로젝트를 구성했다.
-""")
-
-    with st.container(border=True):
-        st.markdown('<div class="card-title">형상 경량화가 실제로 무엇을 하는가 — 삼각형 수와 테셀레이션</div>', unsafe_allow_html=True)
-        st.markdown("""
-컴퓨터 안에는 '곡면'이라는 게 원래 없다. 배 옆면처럼 매끄럽게 휜 강판도, 화면에 그리려면 결국
-아주 작은 평평한 삼각형 조각을 수없이 이어 붙여서 흉내를 낸다 — 이렇게 곡면을 삼각형으로
-잘게 쪼개는 작업을 그래픽스에서 테셀레이션(tessellation)이라고 부른다. 삼각형을 촘촘하게
-많이 쓸수록 원래 곡면에 가깝게 매끄러워 보이고, 적게 쓸수록 각지고 뭉툭해진다 — 그리고
-`triangle_count`(삼각형 수)는 정확히 이 "몇 조각으로 쪼갰는가"를 세는 숫자다. 아래는 똑같은
-원(진짜 곡면)을 삼각형 28개 · 8개 · 4개로만 근사했을 때 눈으로 보이는 차이다.
-""")
-        st.markdown(TESSELLATION_SVG, unsafe_allow_html=True)
-        st.markdown("""
-사실 이건 게임을 켤 때 만나는 '그래픽 옵션'과 원리가 완전히 같다. 옵션을 매우 좋음 → 나쁨으로
-내리면 그래픽카드가 매 프레임 그려야 하는 폴리곤(삼각형) 수가 줄어서 화면은 각지고 단순해지지만,
-대신 훨씬 가볍고 빠르게 돌아간다 — 위 그림의 28개·8개·4개짜리 원이 딱 그 '옵션 단계'를 눈에 보이게
-잘라놓은 것이다. 이 데이터셋의 `lod_level`(1~3) 컬럼도 정확히 그 슬라이더다: 레벨이 낮을수록
-삼각형을 더 적게 남긴 가벼운 버전이라는 뜻이다.
-
-게임 엔진이 이 옵션을 자동으로 적용하는 방식도 힌트가 된다 — 화면 속에서 나와 가까운 캐릭터는
-디테일이 부족하면 바로 눈에 띄니까 삼각형을 촘촘히 쓰지만, 저 멀리 있는 캐릭터는 어차피 화면에
-작게 찍히는 점 하나 수준이라 이목구비까지 그릴 필요가 없다 — 실제로 많은 게임이 카메라와의
-거리에 따라 같은 캐릭터·건물의 고폴리곤 버전과 저폴리곤 버전을 미리 만들어두고 거리가 멀어지면
-자동으로 저폴리곤 쪽으로 바꿔 끼운다(그래서 이름이 Level of Detail, 줄여서 LOD다). ShipHub 뷰어의 LOD도
-같은 발상이다 — 다만 기준이 카메라와의 거리 대신 "지금 이 블록을 왜 열어보는가"다: 전체 배치도를
-훑어보는 용도라면 삼각형이 훨씬 적은 저사양 버전으로도 형체를 알아보는 데 지장이 없지만, 용접선
-하나까지 확인해야 하는 정밀 검수라면 원본 수준의 삼각형 수가 그대로 필요하다.
-""")
-        st.markdown(f"""
-그럼 왜 이 숫자 하나가 파일 크기와 로딩 속도를 좌우할까 — 실제 조선 CAD 설계 모델은 용접
-비드 하나, 배관 나사산 하나까지 정밀하게 표현하려고 형상 하나에 수백만 개의 삼각형을 쓴다
-(이 프로젝트 데이터셋의 `triangle_count`도 최소 507개부터 최대 3,602,657개까지 걸쳐 있다).
-그 원본 그대로 브라우저에서 열면 파일이 수백MB~기가바이트 단위라 로딩에 수 분이 걸리거나
-아예 뻗어버리고, 애초에 열람하려면 수천만원짜리 CAD 라이선스가 설치된 워크스테이션이 있어야
-한다. 하지만 "이 블록이 대충 이런 모양이 맞구나"를 확인하는 QA 리뷰·진도 점검 용도라면,
-위 그림의 삼각형 8개짜리 정도로도 형체를 알아보는 데는 지장이 없다 — ShipHub 3D 뷰어가 하는
-일이 바로 이거다: 원본 CAD 형상을 이런 저해상도(LOD, Level of Detail) 버전으로 다시 테셀레이션해서
-삼각형 수를 1/10 수준으로 줄이고, 그 결과 파일을 브라우저에서 몇 초 만에 열리는 glTF로 저장한다.
-그러니 뒤에 나오는 `triangle_count`는 그냥 임의의 숫자가 아니라 "이 3D 파일이 화면에 그려야 할
-평면 조각이 몇 개인가", 즉 이 블록을 열어보는 게 얼마나 무거운 작업인가를 그대로 나타내는
-지표이고, 이게 왜 공정 지연·QA 리스크와 상관관계를 갖는지는 4번 탭(데이터 분석)에서 직접
-숫자로 확인할 수 있다.
 """)
 
     st.markdown(f"""
@@ -705,143 +565,6 @@ if active_section == SECTIONS[0]:
         "이를 완전히 해소하려면 외부에서 독립적으로 결정되는 실측 신호(예: 실제 기상청 API의 과거 기상데이터 — "
         "도장·야외 용접 등 일부 공정은 실제로 날씨 영향을 받는다)를 회귀 입력에 추가로 결합하는 것이 다음 개선 방향이다."
     )
-
-    st.divider()
-
-    if len(roi_df):
-        latest_month = roi_df["month"].max()
-        latest = roi_df[roi_df["month"] == latest_month]
-        by_dept = (
-            latest.groupby("department")
-            .agg(
-                sessions=("id", "count"),
-                cost_saved=("cost_saved_krw", "sum"),
-                avg_trad_min=("traditional_load_min", "mean"),
-                avg_lite_sec=("lightweight_load_sec", "mean"),
-            )
-            .reset_index()
-        )
-        monthly_saving = by_dept["cost_saved"].sum()
-        avg_cost_per_session = monthly_saving / by_dept["sessions"].sum() if by_dept["sessions"].sum() else 0
-
-        with st.container(border=True):
-            st.markdown('<div class="card-title">전사 확산 시 예상 효과 (추정)</div>', unsafe_allow_html=True)
-            st.caption(
-                f"단가는 파일럿 {by_dept.shape[0]}개 부서 · {int(by_dept['sessions'].sum())}건/월 실측 데이터에서 검증된 "
-                f"세션당 ₩{avg_cost_per_session:,.0f} 절감을 그대로 사용합니다. 인력 규모 기본값은 삼성중공업 실제 임직원 수 "
-                "9,640명(2023 사업보고서, DART 전자공시) 중 도면/형상 검토 업무 비중을 40%로 가정한 값입니다. "
-                "슬라이더를 움직이면 전사 확산 규모에 따라 즉시 재계산됩니다."
-            )
-
-            s1, s2, s3, s4 = st.columns(4)
-            eng_headcount = s1.slider("엔지니어링·생산관리 인력", 500, 9640, 3800, step=100)
-            reviews_per_day = s2.slider("1인당 일평균 검토 횟수", 1, 5, 2)
-            working_days = s3.slider("월 근무일수", 18, 26, 22)
-            cad_license_price = s4.slider("중량 CAD 라이선스 5년 TCO(원/카피)", 20_000_000, 150_000_000, 80_000_000, step=5_000_000)
-
-            enterprise_sessions = eng_headcount * reviews_per_day * working_days
-            enterprise_monthly_saving = enterprise_sessions * avg_cost_per_session
-            enterprise_annual_saving = enterprise_monthly_saving * 12
-
-            replace_ratio = st.slider("검토 전용 인력 중 '풀 CAD 라이선스 → 경량 뷰어' 대체 비율", 0, 100, 40, format="%d%%")
-            license_avoided = eng_headcount * (replace_ratio / 100) * cad_license_price
-
-            hero_metric(
-                "연간 절감 + 라이선스 회피 합산",
-                f"₩{enterprise_annual_saving + license_avoided:,.0f}",
-                f"검토 세션 {enterprise_sessions:,.0f}건/월 기준",
-            )
-            e1, e2 = st.columns(2)
-            e1.metric("전사 연간 검토시간 절감액(추정)", f"₩{enterprise_annual_saving:,.0f}")
-            e2.metric("회피된 CAD 라이선스 비용(추정)", f"₩{license_avoided:,.0f}")
-
-            st.caption(
-                "참고: Siemens NX 롤 기반 라이선스는 기본형 시트당 약 $9,000 + 연 유지보수 20%로 공개되어 있으나(공급사 발표 기준), "
-                "조선업 실무에서 쓰는 CAD+CAM+CAE 통합 엔터프라이즈 구성은 비공개 협상가로 이보다 수 배 높은 것이 일반적입니다. "
-                "위 슬라이더의 8,000만원은 '5년 보유비용(TCO)' 관점의 추정 범위이며, 설계 변경 없이 형상만 확인하면 되는 "
-                "검토 전용 인력까지 전부 풀 라이선스를 지급할 필요가 없어 경량 glTF+LOD 뷰어로 대체하는 흐름이 실제 업계 트렌드입니다."
-            )
-
-        if "contract_value_krw" in raw_df.columns:
-            DELAY_PENALTY_RATE = 0.0013  # 0.13%/일 - 지방자치단체를 당사자로 하는 계약에 관한 법률 시행규칙상 지체상금 표준요율
-            vessel_delay = (
-                raw_df.groupby(["vessel_id", "ship_type", "contract_value_krw"])["delay_days"]
-                .mean()
-                .reset_index()
-            )
-            vessel_delay["exposure_krw"] = (
-                vessel_delay["contract_value_krw"] * DELAY_PENALTY_RATE * vessel_delay["delay_days"].clip(lower=0)
-            )
-            total_exposure = vessel_delay["exposure_krw"].sum()
-            total_contract_value = vessel_delay["contract_value_krw"].sum()
-
-            with st.container(border=True):
-                st.markdown('<div class="card-title">조기 지연 예측의 계약적 가치 — 지체상금 회피</div>', unsafe_allow_html=True)
-                st.caption(
-                    f"현재 {vessel_delay.shape[0]}척(선종별 계약금액은 2026년 실제 SHI 수주 공시·시장가 기준, "
-                    "1번 탭 데이터 정의 참고)의 평균 블록 지연일수를 지체상금 법정 표준요율(계약금액 × 0.13%/일)로 "
-                    "환산한 노출액입니다. 이 대시보드의 지연 예측 모델(5번 탭 회귀 모델)로 조기에 잡아낼 수 있는 지연 "
-                    "비율을 슬라이더로 조절해보세요."
-                )
-                prevent_ratio = st.slider("조기 예측으로 방지 가능한 지연 비율", 0, 100, 30, format="%d%%")
-                prevented_value = total_exposure * (prevent_ratio / 100)
-
-                hero_metric(
-                    f"조기예측 방지 가치 ({prevent_ratio}%)",
-                    f"₩{prevented_value:,.0f}",
-                    f"전체 노출액 ₩{total_exposure:,.0f} 중",
-                )
-                p1, p2 = st.columns(2)
-                p1.metric("전체 지체상금 노출액", f"₩{total_exposure:,.0f}")
-                p2.metric("계약금액 대비 노출 비율", f"{(total_exposure / total_contract_value * 100):.3f}%" if total_contract_value else "-")
-
-            # 지체상금 회피는 "지연을 안 만드는" 하방 리스크 계산이고, 여기는 그 대칭 개념 — 검토 주기가
-            # 빨라진 만큼 계획 대비 더 일찍 인도하면 선주는 그만큼 일찍 용선 영업을 시작해 영업이익이
-            # 늘어나고(반사이익), 실제 조선 계약에도 이를 조선사에 보상하는 조기인도 보너스 조항이 있다.
-            EARLY_DELIVERY_BONUS_RATE = 0.0003  # 0.03%/일 - 해외 표준 조기완공 보너스 조항의 전형적 요율(계약금액의 최대 5% 한도가 관행)
-            EARLY_DELIVERY_BONUS_CAP = 0.05  # 계약금액의 5% - 동일 관행상 상한
-            with st.container(border=True):
-                st.markdown('<div class="card-title">조기인도 반사이익 — 지체상금 회피의 대칭 개념</div>', unsafe_allow_html=True)
-                st.caption(
-                    "지체상금 회피가 '지연을 막아서 손해를 안 보는' 하방 계산이라면, 이건 그 반대 — 검토·QA 주기가 "
-                    "짧아진 만큼 계획보다 며칠 더 일찍 인도하면 선주는 그만큼 일찍 용선 영업을 시작해 매출이 생기고, "
-                    "이 반사이익 중 일부는 실제 조선 계약의 조기인도 보너스(early delivery bonus) 조항으로 조선사에도 "
-                    "돌아온다. 요율은 해외 표준 조기완공 보너스 조항의 전형적 값(계약금액의 0.03%/일, 5% 한도)을 "
-                    "차용했다 — 국내 조선 계약의 실제 조기인도 보너스 요율은 지체상금과 마찬가지로 비공개다."
-                )
-                early_days = st.slider("검토 효율화로 앞당길 수 있는 인도일수(척당 평균)", 0, 15, 3, format="%d일")
-                vessel_delay["early_bonus_krw"] = (
-                    (vessel_delay["contract_value_krw"] * EARLY_DELIVERY_BONUS_RATE * early_days)
-                    .clip(upper=vessel_delay["contract_value_krw"] * EARLY_DELIVERY_BONUS_CAP)
-                )
-                total_early_bonus = vessel_delay["early_bonus_krw"].sum()
-
-                hero_metric(
-                    f"조기인도 반사이익 ({early_days}일 단축 가정)",
-                    f"₩{total_early_bonus:,.0f}",
-                    f"{vessel_delay.shape[0]}척 합산 · 척당 계약금액의 0.03%/일 (5% 한도)",
-                )
-
-        with st.expander("파일럿 실측 데이터 상세 보기"):
-            annual_saving = monthly_saving * 12
-            roi_pct = (annual_saving - DEV_COST_KRW) / DEV_COST_KRW * 100
-            payback_months = DEV_COST_KRW / monthly_saving if monthly_saving else None
-
-            k1, k2, k3, k4 = st.columns(4)
-            k1.metric("파일럿 연간 절감액(실측)", f"₩{annual_saving:,.0f}")
-            k2.metric("파일럿 ROI", f"{roi_pct:.1f}%")
-            k3.metric("투자회수기간", f"{payback_months:.1f}개월" if payback_months else "-")
-            k4.metric("평균 리뷰 로딩시간", f"{by_dept['avg_trad_min'].mean():.1f}분 → {by_dept['avg_lite_sec'].mean():.1f}초")
-
-            c1, c2 = st.columns([1.3, 1])
-            with c1:
-                st.caption(f"{latest_month} 기준 · 월별 절감액 추이 (부서 순차 온보딩 → 정상 가동 램프업)")
-                trend = roi_df.groupby("month")["cost_saved_krw"].sum()
-                st.line_chart(trend)
-            with c2:
-                st.caption("부서별 이번 달 절감액")
-                st.bar_chart(by_dept.set_index("department")["cost_saved"])
-
 
 # ---------------------------------------------------------------------------
 # 2. 데이터 준비
