@@ -378,14 +378,18 @@ def load_roi():
 def train_regression_models(X_full, y_delay):
     """st.tabs()는 보이는 탭과 무관하게 스크립트 전체가 매번 재실행되므로, 캐싱 없이는
     사이드바 필터를 하나만 건드려도 RandomForest(200그루) 포함 4개 모델이 매번 처음부터
-    재학습됐다(실측 약 100초+). X_full/y_delay 내용이 실제로 바뀔 때만 재학습되도록 캐싱한다."""
+    재학습됐다(실측 약 100초+). X_full/y_delay 내용이 실제로 바뀔 때만 재학습되도록 캐싱한다.
+
+    n_jobs=1(단일 스레드): joblib이 n_jobs=-1로 워커 프로세스를 fork하면 워커마다 학습
+    데이터를 복제해서 메모리를 배로 먹는다 - Render 무료 티어(512MB) OOM으로 "Oh no. Error
+    running app"가 떴던 원인. production_data.py의 동일 이슈 수정과 같은 처방."""
     X_train, X_test, y_train, y_test = train_test_split(X_full, y_delay, test_size=0.2, random_state=0)
     models = {
         "LinearRegression": LinearRegression(),
         "Ridge(alpha=1.0)": Ridge(alpha=1.0),
         "Lasso(alpha=0.1)": Lasso(alpha=0.1),
         "ElasticNet(alpha=0.1)": ElasticNet(alpha=0.1, l1_ratio=0.5),
-        "RandomForestRegressor": RandomForestRegressor(n_estimators=200, random_state=0, n_jobs=-1),
+        "RandomForestRegressor": RandomForestRegressor(n_estimators=200, random_state=0, n_jobs=1),
     }
     results = []
     fitted = {}
@@ -408,7 +412,7 @@ def train_classification_models(X_full, y_qa):
     Xc_train, Xc_test, yc_train, yc_test = train_test_split(X_full, y_qa, test_size=0.2, random_state=0)
     models = {
         "LogisticRegression": LogisticRegression(max_iter=1000),
-        "RandomForestClassifier": RandomForestClassifier(n_estimators=200, random_state=0, n_jobs=-1),
+        "RandomForestClassifier": RandomForestClassifier(n_estimators=200, random_state=0, n_jobs=1),
     }
     results = []
     fitted = {}
@@ -1210,7 +1214,7 @@ grid.fit(X_train, y_train)
 """, language="python")
 
         if st.button("GridSearchCV 실행 (수십 초 소요)"):
-            with st.spinner(f"{len(X_train):,}행 학습 데이터에 대해 그리드서치 중... (전체 코어 병렬 사용)"):
+            with st.spinner(f"{len(X_train):,}행 학습 데이터에 대해 그리드서치 중... (단일 코어 - 메모리 제한 대응)"):
                 parameters = {
                     "max_depth": [None, 5, 10],
                     "min_samples_split": [2, 5, 9],
@@ -1218,7 +1222,7 @@ grid.fit(X_train, y_train)
                 }
                 grid = GridSearchCV(
                     RandomForestRegressor(n_estimators=100, random_state=0),
-                    param_grid=parameters, scoring="r2", cv=3, n_jobs=-1,
+                    param_grid=parameters, scoring="r2", cv=3, n_jobs=1,
                 )
                 grid.fit(X_train, y_train)
                 best = grid.best_estimator_
