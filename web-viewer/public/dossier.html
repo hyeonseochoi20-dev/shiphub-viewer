@@ -156,6 +156,9 @@
   .viewport .bl{ bottom:10px; left:10px; transform:scaleY(-1); } .viewport .br{ bottom:10px; right:10px; transform:scale(-1,-1); }
   .viewport .sweep{ position:absolute; inset:0; background:linear-gradient(100deg, transparent 40%, color-mix(in srgb, var(--cyan) 14%, transparent) 50%, transparent 60%); background-size:250% 100%; animation:sweep 5s ease-in-out infinite; }
   @keyframes sweep{ 0%{ background-position:120% 0; } 50%{ background-position:-20% 0; } 100%{ background-position:120% 0; } }
+  @keyframes triIn{ from{ opacity:0; transform:scale(0.5); } to{ opacity:1; transform:scale(1); } }
+  @keyframes breathe{ 0%,100%{ box-shadow:0 0 0 0 color-mix(in srgb, var(--cyan) 20%, transparent); } 50%{ box-shadow:0 0 28px 2px color-mix(in srgb, var(--cyan) 14%, transparent); } }
+  @keyframes numPulse{ 0%{ transform:scale(1); } 30%{ transform:scale(1.035); } 100%{ transform:scale(1); } }
 
   .reveal{ opacity:0; transform:translateY(16px); transition:opacity 0.7s cubic-bezier(.2,.7,.3,1), transform 0.7s cubic-bezier(.2,.7,.3,1); }
   .reveal.in{ opacity:1; transform:translateY(0); }
@@ -174,48 +177,92 @@
   a:focus-visible, button:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px; }
   ::selection{ background:var(--cyan); color:var(--paper); }
 
+  /* ---- 강조/가독성 유틸 ---- */
+  .hl{ color:var(--ink); font-weight:700; }
+  .hl-num{ color:var(--cyan-soft); font-weight:700; font-variant-numeric:tabular-nums; }
+  .mini-stats{ display:flex; gap:1px; background:var(--line); border:1px solid var(--line); margin:16px 0; }
+  .mini-stats div{ flex:1; background:var(--paper); padding:12px 16px; }
+  .mini-stats .k{ font-family:var(--mono); font-size:9.5px; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-soft); }
+  .mini-stats .v{ font-family:var(--mono); font-size:16px; font-weight:700; color:var(--cyan-soft); margin-top:2px; font-variant-numeric:tabular-nums; }
+  @media (max-width:520px){ .mini-stats{ flex-direction:column; } }
+  .note-box{ border-left:2px solid var(--amber); background:color-mix(in srgb, var(--amber) 6%, transparent); padding:12px 16px; margin-top:16px; font-size:12.5px; line-height:1.75; color:var(--ink-soft); }
+  .note-box b{ color:var(--ink); }
+
   /* ---- 03 / TESSELLATION ---- */
   .tess-board{ border:1px solid var(--line-strong); background:var(--paper-2); padding:30px; margin:30px 0 16px 0; display:grid; grid-template-columns:1fr 260px; gap:36px; align-items:center; }
   @media (max-width:720px){ .tess-board{ grid-template-columns:1fr; } }
   .tess-canvas-wrap{ display:flex; flex-direction:column; align-items:center; gap:14px; }
-  .tess-canvas-wrap svg{ width:100%; max-width:280px; height:auto; }
+  .tess-canvas-wrap svg{ width:100%; max-width:280px; height:auto; filter:drop-shadow(0 6px 16px color-mix(in srgb, var(--cyan) 18%, transparent)); animation:breathe 3.2s ease-in-out infinite; border-radius:50%; }
+  .tess-canvas-wrap svg polygon{ transform-box:fill-box; transform-origin:center; animation:triIn 0.38s cubic-bezier(.2,.8,.3,1) backwards; }
+  .tess-canvas-wrap svg circle{ animation:triIn 0.3s ease backwards; }
+  .num-pulse{ animation:numPulse 0.4s cubic-bezier(.3,.7,.4,1); }
   .tess-readout{ font-family:var(--mono); text-align:center; }
-  .tess-readout .n{ font-size:30px; font-weight:700; color:var(--cyan-soft); font-variant-numeric:tabular-nums; }
+  .tess-readout .n{ font-size:34px; font-weight:700; color:var(--cyan-soft); font-variant-numeric:tabular-nums; transition:color 0.2s ease; }
   .tess-readout .lbl{ font-size:12px; color:var(--ink-soft); margin-top:2px; letter-spacing:0.02em; }
-  .tess-controls{ display:flex; flex-direction:column; gap:18px; }
-  .tess-controls .row-label{ font-family:var(--mono); font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-soft); display:flex; justify-content:space-between; }
+  .tess-controls{ display:flex; flex-direction:column; gap:20px; }
+  .tess-controls .row-label{ font-family:var(--mono); font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-soft); display:flex; justify-content:space-between; margin-bottom:4px; }
+  .tess-controls .row-label span:last-child{ color:var(--cyan-soft); font-weight:700; }
+
   .tess-presets{ display:flex; gap:8px; flex-wrap:wrap; }
-  .tess-presets button{ font-family:var(--mono); font-size:11px; padding:6px 10px; background:var(--paper); border:1px solid var(--line-strong); color:var(--ink); cursor:pointer; transition:background 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
-  .tess-presets button:hover{ border-color:var(--cyan); color:var(--cyan-soft); }
-  .tess-presets button.active{ background:var(--cyan); border-color:var(--cyan); color:var(--paper); }
+  .tess-presets button{
+    font-family:var(--mono); font-size:11px; font-weight:600; padding:7px 13px 7px 11px; border-radius:999px;
+    background:var(--paper); border:1px solid var(--line-strong); color:var(--ink-soft); cursor:pointer;
+    display:inline-flex; align-items:center; gap:6px;
+    transition:background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+  }
+  .tess-presets button::before{ content:""; width:6px; height:6px; border-radius:50%; background:var(--line-strong); transition:background 0.2s ease; }
+  .tess-presets button:hover{ border-color:var(--cyan); color:var(--cyan-soft); transform:translateY(-1px); }
+  .tess-presets button:hover::before{ background:var(--cyan-soft); }
+  .tess-presets button:active{ transform:translateY(0); }
+  .tess-presets button.active{ background:var(--cyan); border-color:var(--cyan); color:var(--paper); box-shadow:0 4px 14px -4px color-mix(in srgb, var(--cyan) 60%, transparent); }
+  .tess-presets button.active::before{ background:var(--paper); }
+
   .tess-note{ font-size:13px; line-height:1.7; color:var(--ink-soft); }
 
-  input[type=range]{ -webkit-appearance:none; appearance:none; width:100%; height:1px; background:var(--line-strong); outline:none; margin:10px 0; }
-  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:14px; height:14px; background:var(--cyan); border:2px solid var(--paper); box-shadow:0 0 0 1px var(--cyan); cursor:pointer; }
-  input[type=range]::-moz-range-thumb{ width:14px; height:14px; background:var(--cyan); border:2px solid var(--paper); box-shadow:0 0 0 1px var(--cyan); cursor:pointer; border-radius:0; }
+  /* 채워지는 트랙(--pct는 JS가 값에 맞춰 갱신) + 둥글고 입체감 있는 손잡이 */
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:999px; outline:none; margin:6px 0;
+    background:linear-gradient(to right, var(--cyan) 0%, var(--cyan) var(--pct,50%), var(--line) var(--pct,50%), var(--line) 100%);
+    transition:box-shadow 0.15s ease;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:var(--paper);
+    border:3px solid var(--cyan); cursor:pointer; margin-top:0;
+    box-shadow:0 2px 6px rgba(0,0,0,0.18), 0 0 0 0 color-mix(in srgb, var(--cyan) 35%, transparent);
+    transition:transform 0.15s ease, box-shadow 0.2s ease;
+  }
+  input[type=range]::-webkit-slider-thumb:hover{ transform:scale(1.12); }
+  input[type=range]:active::-webkit-slider-thumb{ box-shadow:0 2px 6px rgba(0,0,0,0.18), 0 0 0 7px color-mix(in srgb, var(--cyan) 22%, transparent); }
+  input[type=range]::-moz-range-track{ height:6px; border-radius:999px; background:var(--line); }
+  input[type=range]::-moz-range-progress{ height:6px; border-radius:999px; background:var(--cyan); }
+  input[type=range]::-moz-range-thumb{
+    width:20px; height:20px; border-radius:50%; background:var(--paper); border:3px solid var(--cyan); cursor:pointer;
+    box-shadow:0 2px 6px rgba(0,0,0,0.18); transition:transform 0.15s ease;
+  }
+  input[type=range]::-moz-range-thumb:hover{ transform:scale(1.12); }
 
   .analogy-grid{ display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); margin:26px 0; }
   @media (max-width:720px){ .analogy-grid{ grid-template-columns:1fr; } }
-  .analogy-card{ background:var(--paper); padding:22px 24px; }
-  .analogy-card .k{ font-family:var(--mono); font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--cyan-soft); margin-bottom:8px; }
-  .analogy-card p{ font-size:14px; line-height:1.75; color:var(--ink-soft); margin:0; }
+  .analogy-card{ background:var(--paper); padding:24px 26px; position:relative; }
+  .analogy-card .k{ font-family:var(--mono); font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--cyan-soft); margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+  .analogy-card .k::before{ content:""; width:16px; height:1px; background:var(--cyan-soft); }
+  .analogy-card p{ font-size:14px; line-height:1.8; color:var(--ink-soft); margin:0; }
   .analogy-card strong{ color:var(--ink); }
 
   /* ---- 04 / ROI calculator ---- */
   .roi-panel{ border:1px solid var(--line-strong); background:var(--paper-2); padding:30px; margin:30px 0; }
-  .roi-sliders{ display:grid; grid-template-columns:1fr 1fr; gap:24px 40px; margin-bottom:8px; }
+  .roi-sliders{ display:grid; grid-template-columns:1fr 1fr; gap:26px 40px; margin-bottom:8px; }
   @media (max-width:720px){ .roi-sliders{ grid-template-columns:1fr; } }
-  .roi-slider .row-label{ font-family:var(--mono); font-size:11px; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-soft); display:flex; justify-content:space-between; }
-  .roi-slider .row-label b{ color:var(--cyan-soft); font-weight:600; }
-  .roi-hero{ margin-top:26px; padding:22px 24px; border:1px solid var(--cyan); background:color-mix(in srgb, var(--cyan) 8%, transparent); }
+  .roi-slider .row-label{ font-family:var(--mono); font-size:11px; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-soft); display:flex; justify-content:space-between; margin-bottom:2px; }
+  .roi-slider .row-label b{ color:var(--cyan-soft); font-weight:700; font-size:12px; }
+  .roi-hero{ margin-top:28px; padding:24px 26px; border:1px solid var(--cyan); background:linear-gradient(135deg, color-mix(in srgb, var(--cyan) 10%, transparent), color-mix(in srgb, var(--cyan) 3%, transparent)); position:relative; overflow:hidden; }
   .roi-hero .k{ font-family:var(--mono); font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-soft); }
-  .roi-hero .v{ font-family:var(--display); font-size:clamp(28px,4vw,40px); font-weight:700; color:var(--cyan-soft); font-variant-numeric:tabular-nums; margin-top:4px; }
+  .roi-hero .v{ font-family:var(--display); font-size:clamp(28px,4vw,42px); font-weight:700; color:var(--cyan-soft); font-variant-numeric:tabular-nums; margin-top:6px; transition:opacity 0.15s ease; }
   .roi-mini{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); margin-top:1px; }
   @media (max-width:720px){ .roi-mini{ grid-template-columns:1fr; } }
-  .roi-mini div{ background:var(--paper); padding:16px 18px; }
+  .roi-mini div{ background:var(--paper); padding:18px 20px; }
   .roi-mini .k{ font-family:var(--mono); font-size:10px; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-soft); }
-  .roi-mini .v{ font-family:var(--mono); font-size:18px; font-weight:600; color:var(--ink); margin-top:4px; font-variant-numeric:tabular-nums; }
-  .roi-caption{ font-size:12px; color:var(--ink-soft); margin-top:16px; line-height:1.7; }
+  .roi-mini .v{ font-family:var(--mono); font-size:19px; font-weight:700; color:var(--ink); margin-top:5px; font-variant-numeric:tabular-nums; }
 </style>
 
 <div class="progress" id="progress"></div>
@@ -249,7 +296,7 @@
         <p class="lede">
           조선소에서 형상 하나를 확인하는 데 걸리는 시간과, 그 형상을 볼 자격을 얻기 위해 지불하는 라이선스
           비용은 둘 다 비정상적으로 크다. 무거운 B-REP CAD 파일은 열리는 데만 분 단위가 걸리고,
-          Siemens NX 같은 엔터프라이즈 풀 라이선스는 5년 보유비용(TCO) 기준 <strong>최대 1억원대</strong>에 달해 도면을 &ldquo;보기만&rdquo; 하는
+          Siemens NX 같은 엔터프라이즈 풀 라이선스는 5년간 구입·유지에 드는 총비용 기준 <strong>최대 1억원대</strong>에 달해 도면을 &ldquo;보기만&rdquo; 하는
           인력에게도 똑같은 비용이 청구된다.
         </p>
         <p>
@@ -314,10 +361,14 @@
           <button type="button" data-n="6">6 · 각짐</button>
           <button type="button" data-n="3">3 · 삼각형</button>
         </div>
+        <div class="mini-stats">
+          <div><div class="k">triangle_count 최소</div><div class="v">507개</div></div>
+          <div><div class="k">triangle_count 최대</div><div class="v">3,602,657개</div></div>
+        </div>
         <p class="tess-note">
-          이 프로젝트 데이터셋의 <code>triangle_count</code>는 최소 507개부터 최대 3,602,657개까지
-          걸쳐 있다 — 원본 CAD는 용접 비드 하나까지 표현하려고 형상 하나에 수백만 개를 쓰지만, 뷰어는
-          이걸 1/10 수준으로 재테셀레이션해서 몇 초 만에 브라우저에서 열리게 만든다.
+          원본 CAD는 용접 비드 하나까지 표현하려고 형상 하나에 <span class="hl">수백만 개</span>를 쓴다. 뷰어는
+          이걸 <span class="hl">1/10 수준</span>으로 재테셀레이션해서 <span class="hl">몇 초</span> 만에
+          브라우저에서 열리게 만든다.
         </p>
       </div>
     </div>
@@ -326,20 +377,20 @@
       <div class="analogy-card">
         <div class="k">게임 그래픽 옵션</div>
         <p>
-          게임을 켤 때 만나는 &lsquo;매우 좋음 → 나쁨&rsquo; 그래픽 옵션과 원리가 완전히 같다. 옵션을
-          내리면 그래픽카드가 매 프레임 그려야 하는 폴리곤(삼각형) 수가 줄어서 화면은 각지고 단순해지지만
-          대신 훨씬 가볍게 돌아간다. 이 데이터셋의 <strong>lod_level(1~3)</strong> 컬럼이 정확히 그
-          슬라이더다 — 레벨이 낮을수록 삼각형을 더 적게 남긴 가벼운 버전이라는 뜻이다.
+          게임을 켤 때 만나는 &lsquo;매우 좋음 → 나쁨&rsquo; 그래픽 옵션과 원리가 완전히 같다.<br><br>
+          옵션을 내리면 폴리곤(삼각형) 수가 줄어서 화면은 단순해지지만 <span class="hl">훨씬 가볍게</span> 돌아간다.
+          이 데이터셋의 <strong>lod_level(1~3)</strong> 컬럼이 정확히 그 슬라이더다 — 레벨이 낮을수록
+          삼각형을 더 적게 남긴 가벼운 버전이라는 뜻이다.
         </p>
       </div>
       <div class="analogy-card">
         <div class="k">거리 기반 LOD</div>
         <p>
-          많은 게임 엔진이 카메라와의 거리에 따라 같은 캐릭터·건물의 고폴리곤/저폴리곤 버전을 미리 만들어두고
-          자동으로 바꿔 끼운다 — 멀리 있는 캐릭터는 어차피 점 하나 수준으로 찍히니 이목구비까지 그릴 필요가
-          없다(그래서 이름이 <strong>Level of Detail</strong>이다). ShipHub 뷰어는 거리 대신
-          &ldquo;지금 왜 열어보는가&rdquo;가 기준이다 — 훑어보는 용도면 저사양으로 충분하고, 정밀 검수라면
-          원본 수준이 필요하다.
+          많은 게임 엔진이 카메라와의 거리에 따라 캐릭터·건물의 고폴리곤/저폴리곤 버전을 자동으로 바꿔
+          끼운다 — 멀리 있는 캐릭터는 어차피 점 하나 수준으로 찍히니 그릴 필요가 없다(그래서 이름이
+          <strong>Level of Detail</strong>이다).<br><br>
+          ShipHub 뷰어는 거리 대신 <span class="hl">&ldquo;지금 왜 열어보는가&rdquo;</span>가 기준이다 —
+          훑어보는 용도면 저사양으로 충분하고, 정밀 검수라면 원본 수준이 필요하다.
         </p>
       </div>
     </div>
@@ -373,7 +424,7 @@
           <input type="range" id="rngDays" min="18" max="26" value="22" step="1">
         </div>
         <div class="roi-slider">
-          <div class="row-label"><span>중량 CAD 라이선스 5년 TCO(원/카피)</span><b id="lblLicense">8,000만원</b></div>
+          <div class="row-label"><span>중량 CAD 라이선스 5년 보유비용(원/카피)</span><b id="lblLicense">8,000만원</b></div>
           <input type="range" id="rngLicense" min="20000000" max="150000000" value="80000000" step="5000000">
         </div>
         <div class="roi-slider">
@@ -395,12 +446,12 @@
         <div><div class="k">회피된 CAD 라이선스 비용</div><div class="v" id="roiLicense">₩0</div></div>
         <div><div class="k">지체상금 회피 가치</div><div class="v" id="roiPrevent">₩0</div></div>
       </div>
-      <p class="roi-caption">
-        지체상금 회피 가치 산정 기준: 실측 53척 · 총 노출액 ₩53,017,845,759(계약금액 × 0.13%/일 × 실측
-        지연일수, 지방계약법 시행규칙 제75조 표준요율을 민간 조선 계약에 대리 지표로 차용). 요율 자체는
-        실제 법령이지만 &ldquo;민간 계약에도 유사 적용된다&rdquo;는 가정이 들어간 값이라는 점은 정직하게
-        밝혀둔다.
-      </p>
+      <div class="note-box">
+        <b>지체상금 회피 가치 산정 기준</b> — 실측 53척 · 총 노출액 ₩53,017,845,759(계약금액 × 0.13%/일 ×
+        실측 지연일수). 이 요율(지방계약법 시행규칙 제75조)은 실제 법령이지만 지자체 발주 공공계약
+        표준요율이다 — 민간 조선 계약의 실제 요율은 비공개라 <b>&ldquo;유사 적용된다&rdquo;는 가정</b>이
+        들어간 대리 지표임을 밝혀둔다.
+      </div>
     </div>
   </section>
 
@@ -408,12 +459,16 @@
     <div class="sec-head"><div class="num">05 / DEMO</div><h2>실행 화면</h2></div>
     <div class="sec-body">
       <div class="spacer"></div>
-      <div><p class="lede">3D 뷰어와 Streamlit 대시보드 실제 조작 화면을 이 자리에 녹화본으로 교체하세요.</p></div>
+      <div><p class="lede">탱커선 단면·생산공정 진도(링블록 탑재 시뮬레이션)를 확인하다가 컨테이너선으로 모델을 바꾸는 실제 조작 화면이다.</p></div>
     </div>
-    <div class="viewport">
-      <div class="sweep"></div>
+    <div class="viewport" id="demoViewport">
       <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
-      <div class="msg">VIDEO SLOT — 16:9<br>screen recording (.mp4/.webm)을 이 &lt;video&gt; 프레임에 넣어주세요</div>
+      <img src="shiphub-demo.gif" alt="ShipHub 3D 뷰어 실행 화면 - 단면 도구, 생산공정 진도, 모델 전환"
+           style="width:100%; height:100%; object-fit:cover; position:relative; z-index:1;"
+           onerror="this.style.display='none'; document.getElementById('demoFallback').style.display='flex';">
+      <div class="sweep" id="demoFallback" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center;">
+        <div class="msg">VIDEO SLOT — 16:9<br>shiphub-demo.gif를 web-viewer/public/에 넣어주세요</div>
+      </div>
     </div>
   </section>
 
@@ -534,13 +589,18 @@
         tri.setAttribute('fill-opacity', '0.22');
         tri.setAttribute('stroke', 'var(--cyan-soft)');
         tri.setAttribute('stroke-width', '1');
+        // 삼각형마다 살짝 시차를 두고 튕기듯 나타나게 - 다시 그려질 때마다 정적으로
+        // 스냅되지 않고 "다시 짜여지는" 느낌을 준다.
+        tri.style.animationDelay = (j * (280 / n)) + 'ms';
         svg.appendChild(tri);
       }
 
       nEl.textContent = n;
+      nEl.classList.remove('num-pulse'); void nEl.offsetWidth; nEl.classList.add('num-pulse');
       lblEl.textContent = labelFor(n);
       rangeLbl.textContent = n + '개';
       range.value = n;
+      setPct(range);
       presets.forEach(function(btn){ btn.classList.toggle('active', parseInt(btn.getAttribute('data-n'), 10) === n); });
     }
 
@@ -550,6 +610,39 @@
     });
     draw(28);
   })();
+
+  // 모든 range 슬라이더 공통: 트랙이 값까지 색으로 채워지도록 --pct 커스텀 속성을 갱신
+  function setPct(input){
+    var min = parseFloat(input.min || 0), max = parseFloat(input.max || 100), val = parseFloat(input.value);
+    var pct = max > min ? ((val - min) / (max - min)) * 100 : 0;
+    input.style.setProperty('--pct', pct + '%');
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('input[type=range]'), function(el){
+    setPct(el);
+    el.addEventListener('input', function(){ setPct(el); });
+  });
+
+  // 숫자를 스냅시키지 않고 부드럽게 세면서 바뀌게 하는 공용 트위닝 유틸 - 슬라이더를 움직일 때마다
+  // ROI 숫자가 살아있는 계기판처럼 움직이는 느낌을 준다.
+  var tweenState = new WeakMap();
+  function tweenTo(el, target, formatter){
+    var prev = tweenState.get(el);
+    if (prev && prev.raf) cancelAnimationFrame(prev.raf);
+    var from = prev ? prev.current : target;
+    var state = { current: from, raf: null };
+    tweenState.set(el, state);
+    var start = null, dur = 420;
+    function step(ts){
+      if (!start) start = ts;
+      var p = Math.min(1, (ts - start) / dur);
+      var eased = 1 - Math.pow(1 - p, 3);
+      state.current = from + (target - from) * eased;
+      el.textContent = formatter(state.current);
+      if (p < 1){ state.raf = requestAnimationFrame(step); }
+      else { state.current = target; }
+    }
+    state.raf = requestAnimationFrame(step);
+  }
 
   // ---- 04 / EVIDENCE: ROI 계산기. Streamlit 대시보드(app.py)의 동일한 계산 로직을 그대로
   // JS로 옮긴 것 - 기준값(세션당 절감액, 지체상금 노출액 등)은 실제 MariaDB 실측치를 고정값으로 박아넣었다
@@ -570,6 +663,11 @@
       prevent: document.getElementById('rngPrevent'), lblPrevent: document.getElementById('lblPrevent'),
     };
     if (!els.headcount) return; // 이 섹션이 없는 페이지에서는 조용히 스킵
+
+    var roiHeroEl = document.getElementById('roiHero');
+    var roiSavingEl = document.getElementById('roiSaving');
+    var roiLicenseEl = document.getElementById('roiLicense');
+    var roiPreventEl = document.getElementById('roiPrevent');
 
     function recompute(){
       var headcount = parseInt(els.headcount.value, 10);
@@ -592,10 +690,10 @@
       var licenseAvoided = headcount * (replaceRatio/100) * license;
       var preventedValue = TOTAL_EXPOSURE * (preventRatio/100);
 
-      document.getElementById('roiHero').textContent = fmtKRW(annualSaving + licenseAvoided);
-      document.getElementById('roiSaving').textContent = fmtKRW(annualSaving);
-      document.getElementById('roiLicense').textContent = fmtKRW(licenseAvoided);
-      document.getElementById('roiPrevent').textContent = fmtKRW(preventedValue);
+      tweenTo(roiHeroEl, annualSaving + licenseAvoided, fmtKRW);
+      tweenTo(roiSavingEl, annualSaving, fmtKRW);
+      tweenTo(roiLicenseEl, licenseAvoided, fmtKRW);
+      tweenTo(roiPreventEl, preventedValue, fmtKRW);
     }
 
     Object.keys(els).forEach(function(k){
