@@ -170,14 +170,18 @@ def main(seed=42):
                         planned_days = max(3, int(rng.normal(14, 4)))
 
                         complexity_factor = triangle_count / 100000
-                        priority_factor = {"High": -1.2, "Medium": 0.0, "Low": 1.2}[priority]
+                        # 우선순위 효과 자체에도 레코드별 지터를 줘서 "우선순위 = 정확히 이 상수"인
+                        # 깨끗한 계단식 관계가 되지 않게 한다 (현실에서는 같은 우선순위라도 담당자·
+                        # 협력사 사정에 따라 실제 효과가 들쭉날쭉하다)
+                        priority_base = {"High": -0.9, "Medium": 0.0, "Low": 0.9}[priority]
+                        priority_factor = priority_base + rng.normal(0, 0.4)
                         stage_factor = STAGE_DELAY_FACTOR[stage]
                         dept_factor = DEPT_DELAY_FACTOR[dept]
-                        # 노이즈 표준편차를 체계적 요인들의 합과 비슷한 크기로 잡아, 회귀모델이
-                        # 생성식을 그대로 역산하지 않고 "부분적으로만 설명 가능한" 현실적인 관계가 되게 한다
+                        # 노이즈 표준편차를 체계적 요인들의 합보다 크게 잡아, 회귀모델이 생성식을
+                        # 그대로 역산하지 못하고 "부분적으로만 설명 가능한" 현실적인 관계가 되게 한다
                         delay_days = round(
                             complexity_factor * 3 + priority_factor + stage_factor + dept_factor
-                            + rng.normal(0, 2.2),
+                            + rng.normal(0, 3.0),
                             1,
                         )
                         delay_days = max(-6.0, delay_days)
