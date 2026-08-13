@@ -4,6 +4,28 @@ import { API_BASE } from '../config'
 
 // MariaDB 생산 DB를 REST로 직접 조회하는 패널 (converter.py의 /api/ai/* 엔드포인트,
 // production_data.py 공용 로직 - mcp_server.py와 동일한 쿼리/모델을 로컬 HTTP로 노출)
+
+// 공정단계별 색상 - 실제 블록별 3D 형상 임베딩/썸네일은 없으므로(메타데이터 기반 최근접
+// 이웃일 뿐), 대신 "어떤 공정의 블록인지"를 색으로 즉시 구분되게 해서 목록을 한눈에
+// 훑어볼 수 있게 한다.
+const STAGE_STYLE = {
+  절단: { bg: 'bg-orange-600' },
+  조립: { bg: 'bg-blue-600' },
+  탑재: { bg: 'bg-purple-600' },
+  의장: { bg: 'bg-pink-600' },
+  도장: { bg: 'bg-green-600' },
+  시운전: { bg: 'bg-cyan-600' },
+}
+
+// triangle_count 분포가 507~360만으로 매우 치우쳐 있어(중앙값 26,634) 선형으로 막대를
+// 그리면 대부분 0%로 보인다. 로그 스케일로 0~100%에 매핑해 복잡도 차이를 시각적으로
+// 구분되게 한다. 500=최소 근사치, 2,000,000=상위 구간 상한 근사치.
+function complexityPct(triangleCount) {
+  const t = Math.max(500, triangleCount || 500)
+  const pct = ((Math.log10(t) - Math.log10(500)) / (Math.log10(2000000) - Math.log10(500))) * 100
+  return Math.min(100, Math.max(5, Math.round(pct)))
+}
+
 export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState('faq') // 'faq' | 'query' | 'predict'
@@ -291,20 +313,44 @@ export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
 
           {similar && (
             <div ref={similarRef} className="mt-2 border-t border-gray-700 pt-2">
-              <p className="text-[10px] text-gray-500 mb-1">{similar.method}</p>
-              {similar.results.map((r) => (
-                <div key={r.block_id} className="text-[11px] text-gray-300 py-0.5 flex items-center justify-between gap-2">
-                  <span className="font-mono truncate">{r.block_name}</span>
-                  <span className="flex items-center gap-2 shrink-0">
-                    <span className="text-gray-500">거리 {r.similarity_distance}</span>
-                    {onFlyToBlock && (
-                      <button onClick={() => onFlyToBlock(r)} className="text-cyan-400 hover:text-cyan-300" title="뷰로 이동">
-                        <FiCrosshair className="w-3 h-3" />
-                      </button>
-                    )}
-                  </span>
-                </div>
-              ))}
+              <p className="text-[10px] text-gray-500">{similar.method}</p>
+              <p className="text-[10px] text-gray-600 mb-1.5">
+                공정단계 색상·복잡도 막대로 비슷한 형상끼리 한눈에 훑어보고, 엉뚱한 블록을 고르는 오작업을 줄이기 위한 목록입니다
+              </p>
+              <div className="space-y-1.5">
+                {similar.results.map((r) => {
+                  const stage = STAGE_STYLE[r.process_stage] || { bg: 'bg-gray-600' }
+                  const pct = complexityPct(r.triangle_count)
+                  return (
+                    <div key={r.block_id} className="bg-gray-900/60 rounded p-1.5 flex items-center gap-2">
+                      <div
+                        className={`shrink-0 w-9 h-9 rounded ${stage.bg} flex items-center justify-center text-[10px] font-semibold text-white leading-tight text-center`}
+                        title={`공정: ${r.process_stage}`}
+                      >
+                        {r.process_stage}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-[11px] text-gray-300 truncate">{r.block_name}</span>
+                          <span className="text-[10px] text-gray-500 shrink-0">거리 {r.similarity_distance}</span>
+                        </div>
+                        <div className="text-[10px] text-gray-500 truncate">{r.ship_type} · {r.department}</div>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <div className="flex-1 h-1.5 rounded-full bg-gray-700 overflow-hidden">
+                            <div className={`h-full rounded-full ${stage.bg}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-[9px] text-gray-500 shrink-0 tabular-nums">복잡도 {pct}%</span>
+                          {onFlyToBlock && (
+                            <button onClick={() => onFlyToBlock(r)} className="text-cyan-400 hover:text-cyan-300 shrink-0" title="뷰로 이동">
+                              <FiCrosshair className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
         </div>
