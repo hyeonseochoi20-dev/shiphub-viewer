@@ -601,13 +601,13 @@ if active_section == SECTIONS[0]:
          "Siemens NX 공급사 발표 가격(기본형 시트당 약 $9,000 + 연 유지보수 20%) 기준 5년 보유비용 산정",
          "https://community.sw.siemens.com/s/question/0D5KZ000000b5bg0AA/nx-annual-maintenance-fee"),
         ("department 시급(hourly_cost_krw)", "⚪ 통계적 가정",
-         "직급/부서별 실무 엔지니어 시급 참고 수준의 가정 — 통계청/고용노동부 공시 데이터와 직접 연결되지는 않음(정직하게 명시)", None),
+         "직급/부서별 실무 엔지니어 시급 참고 수준의 가정 — 통계청/고용노동부 공시 데이터와 직접 연결되지는 않음(정직하게 명시)", ""),
         ("triangle_count 분포", "⚪ 통계적 가정",
-         "CAD/BIM 업계 벤치마크(1~2M 삼각형에서 통합GPU 버벅임 시작, Draco 압축이 70~95% 절감) 기준 lognormal 분포로 '압축 후 출력값'다운 규모·왜도 설정", None),
-        ("file_size_mb", "⚪ 통계적 가정", "triangle_count에 비례 + 노이즈 (형상 복잡도와 파일 크기의 실제 상관관계 모사)", None),
+         "CAD/BIM 업계 벤치마크(1~2M 삼각형에서 통합GPU 버벅임 시작, Draco 압축이 70~95% 절감) 기준 lognormal 분포로 '압축 후 출력값'다운 규모·왜도 설정", ""),
+        ("file_size_mb", "⚪ 통계적 가정", "triangle_count에 비례 + 노이즈 (형상 복잡도와 파일 크기의 실제 상관관계 모사)", ""),
         ("delay_days / qa_defect_count", "⚪ 통계적 가정",
-         "'형상이 복잡할수록 공정 지연·QA 결함 확률이 커진다'는 조선 실무 통념을 lognormal + 조건부 규칙으로 생성 — 롱테일(가끔 크게 지연) 형태까지 반영", None),
-        ("block_name / created_at", "⚪ 통계적 가정", "식별자 규칙 생성, 최근 180일 균등 분산 — 값 자체에 실무적 의미 없음", None),
+         "'형상이 복잡할수록 공정 지연·QA 결함 확률이 커진다'는 조선 실무 통념을 lognormal + 조건부 규칙으로 생성 — 롱테일(가끔 크게 지연) 형태까지 반영", ""),
+        ("block_name / created_at", "⚪ 통계적 가정", "식별자 규칙 생성, 최근 180일 균등 분산 — 값 자체에 실무적 의미 없음", ""),
     ], columns=["대상", "등급", "근거", "출처 링크"])
     st.dataframe(
         source_doc, hide_index=True, use_container_width=True,
