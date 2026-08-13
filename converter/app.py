@@ -543,7 +543,7 @@ if active_section == SECTIONS[0]:
         ("전사 확산 헤드카운트 기본값 3,800명", "🔵 실제 자료 캘리브레이션",
          "DART 2023 사업보고서 실제 임직원수 9,640명 × 설계/생산 엔지니어링 비중 40% 가정",
          "https://kind.krx.co.kr/common/disclsviewer.do?method=searchInitInfo&acptNo=20240313002136"),
-        ("5년 중량 CAD 라이선스 TCO 8,000만원", "🔵 실제 자료 캘리브레이션",
+        ("5년 중량 CAD 라이선스 보유비용 8,000만원", "🔵 실제 자료 캘리브레이션",
          "Siemens NX 공급사 발표 가격(기본형 시트당 약 $9,000 + 연 유지보수 20%) 기준 5년 보유비용 산정",
          "https://community.sw.siemens.com/s/question/0D5KZ000000b5bg0AA/nx-annual-maintenance-fee"),
         ("department 시급(hourly_cost_krw)", "⚪ 통계적 가정",
