@@ -460,14 +460,20 @@ with st.sidebar:
         st.rerun()
     st.caption(f"데이터 소스: {st.session_state.get('data_source', '-')}")
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
-    ["1. 데이터 정의", "2. 데이터 준비", "3. 데이터 전처리", "4. 데이터 분석(EDA)", "5. 학습·예측·평가", "6. 성능 향상", "7. 실시간 예측", "8. 기술 스택"]
-)
+SECTIONS = ["1. 데이터 정의", "2. 데이터 준비", "3. 데이터 전처리", "4. 데이터 분석(EDA)", "5. 학습·예측·평가", "6. 성능 향상", "7. 실시간 예측", "8. 기술 스택"]
+
+# st.tabs()는 화면에 보이는 탭과 무관하게 8개 탭 본문을 매 재실행마다 전부 실행해서
+# (슬라이더 하나만 움직여도 8개 탭의 차트·모델 학습이 전부 다시 돎) Render 무료 티어(512MB)에서
+# 메모리 초과로 죽는 원인이 됐다. segmented_control은 선택값만 반환하는 위젯이라
+# 아래에서 if로 분기해 선택된 섹션 하나만 실행되게 할 수 있다 - 탭처럼 보이면서도 지연 로딩된다.
+active_section = st.segmented_control("섹션", SECTIONS, default=SECTIONS[0], label_visibility="collapsed")
+if active_section is None:
+    active_section = SECTIONS[0]
 
 # ---------------------------------------------------------------------------
 # 1. 데이터 정의
 # ---------------------------------------------------------------------------
-with tab1:
+if active_section == SECTIONS[0]:
     section("01", "프로젝트 소개 · 데이터 정의", "목표 · 수집 방법과 컬럼 사전")
     with st.container(border=True):
         st.markdown('<div class="card-title">프로젝트 소개</div>', unsafe_allow_html=True)
@@ -578,7 +584,7 @@ with tab1:
 # ---------------------------------------------------------------------------
 # 2. 데이터 준비
 # ---------------------------------------------------------------------------
-with tab2:
+if active_section == SECTIONS[1]:
     section("02", "데이터 준비", "정규화 스키마 · JOIN 쿼리 · df.head() / shape / describe() / info()")
 
     with st.container(border=True):
@@ -621,7 +627,7 @@ df = pd.read_sql(sa.text(query), engine.connect())
 # ---------------------------------------------------------------------------
 # 3. 데이터 전처리 (핵심 섹션)
 # ---------------------------------------------------------------------------
-with tab3:
+if active_section == SECTIONS[2]:
     section("03", "데이터 전처리", "결측치 · 중복제거 · datetime · 파생변수 · 이상치 · 인코딩 · 스케일링 · Feature Selection")
     df = raw_df.copy()
 
@@ -810,7 +816,7 @@ model_scaled = model_scaler.fit_transform(df[model_num_cols])
 # ---------------------------------------------------------------------------
 # 4. 데이터 분석 (EDA)
 # ---------------------------------------------------------------------------
-with tab4:
+if active_section == SECTIONS[3]:
     section("04", "데이터 분석", "EDA · 상관관계 · 분포")
     df = st.session_state.get("proc_df", raw_df.copy())
 
@@ -970,7 +976,7 @@ with tab4:
 # ---------------------------------------------------------------------------
 # 5. 머신러닝 학습 / 예측 / 평가
 # ---------------------------------------------------------------------------
-with tab5:
+if active_section == SECTIONS[4]:
     section("05", "학습 · 예측 · 평가", "회귀/분류 모델 비교, 피처 중요도")
     df = st.session_state.get("proc_df", raw_df.copy())
     X_full = st.session_state.get("X_full")
@@ -1075,7 +1081,7 @@ for name, model in models.items():
 # ---------------------------------------------------------------------------
 # 6. 성능 향상
 # ---------------------------------------------------------------------------
-with tab6:
+if active_section == SECTIONS[5]:
     section("06", "성능 향상", "GridSearchCV · 다항 특성")
     X_full = st.session_state.get("X_full")
     df = st.session_state.get("proc_df")
@@ -1176,7 +1182,7 @@ ridge.fit(X_train_poly, y_train)
 # ---------------------------------------------------------------------------
 # 7. 실시간 예측
 # ---------------------------------------------------------------------------
-with tab7:
+if active_section == SECTIONS[6]:
     section("07", "실시간 예측", "학습된 모델로 즉시 추론")
     st.caption("학습된 모델에 새 블록 정보를 입력하면 예상 지연일수 / QA 합격 확률을 즉시 예측합니다")
 
@@ -1235,7 +1241,7 @@ with tab7:
 # ---------------------------------------------------------------------------
 # 8. 기술 스택
 # ---------------------------------------------------------------------------
-with tab8:
+if active_section == SECTIONS[7]:
     section("08", "기술 스택", "3D 뷰어부터 이 대시보드까지 — 처음부터 끝까지 쓴 것 전부")
     st.markdown(
         '<div class="hero-sub" style="margin-bottom:1.4rem;">'
