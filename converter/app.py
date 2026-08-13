@@ -13,6 +13,7 @@ from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
+import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -28,6 +29,15 @@ from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.preprocessing import OneHotEncoder, PolynomialFeatures, StandardScaler
 
 BASE = Path(__file__).parent
+
+# matplotlib 기본 폰트(DejaVu Sans)는 한글 글리프가 없어서 차트에 한글을 쓰면 서버 환경(특히
+# 폰트가 거의 안 깔린 Render 컨테이너)에서 빈 네모(tofu)로 깨진다. 폰트 파일을 레포에 직접
+# 포함시켜(fonts/NanumGothic-Regular.ttf, SIL OFL 라이선스) 어떤 배포 환경에서도 동일하게 렌더링되게 한다.
+_FONT_PATH = BASE / "fonts" / "NanumGothic-Regular.ttf"
+if _FONT_PATH.exists():
+    fm.fontManager.addfont(str(_FONT_PATH))
+    plt.rcParams["font.family"] = fm.FontProperties(fname=str(_FONT_PATH)).get_name()
+plt.rcParams["axes.unicode_minus"] = False  # 한글 폰트 사용 시 마이너스 기호(−)가 깨지는 것 방지
 
 # 교안 68~70p에서 다룬 pymysql/SQLAlchemy 연결 패턴 그대로 사용.
 # 연결 정보는 환경변수로 오버라이드 가능 (setup_mariadb.py와 동일한 기본값).
@@ -50,6 +60,15 @@ NUMERIC_COLS = ["triangle_count", "file_size_mb", "lod_level", "planned_days", "
 # qa_defect_count(qa_status를 결정짓는 규칙 자체)는 데이터 누수(data leakage)이므로 제외
 MODEL_NUMERIC_COLS = ["triangle_count", "file_size_mb", "lod_level", "planned_days"]
 CATEGORICAL_COLS = ["department", "process_stage", "priority", "ship_type"]
+
+# 차트 제목/축 라벨용 한글 표기 - 원본 컬럼명(raw_df 조회·코드 표시용)은 그대로 두고 시각화에서만 치환
+COL_LABELS_KO = {
+    "triangle_count": "삼각형 수", "file_size_mb": "파일 크기(MB)", "lod_level": "LOD 레벨",
+    "planned_days": "계획일수", "actual_days": "실제일수", "qa_defect_count": "QA 결함수",
+    "delay_days": "지연일수", "department": "부서", "process_stage": "공정 단계",
+    "priority": "우선순위", "ship_type": "선종",
+}
+PRIORITY_LABELS_KO = {"High": "높음", "Medium": "보통", "Low": "낮음"}
 
 # Barker 표기법 ERD (schema.sql 물리 스키마 기준 - 실선/까마귀발=필수·다수, 점선=선택)
 ERD_SVG_BARKER = """
@@ -466,6 +485,16 @@ SECTIONS = ["1. 데이터 정의", "2. 데이터 준비", "3. 데이터 전처�
 # (슬라이더 하나만 움직여도 8개 탭의 차트·모델 학습이 전부 다시 돎) Render 무료 티어(512MB)에서
 # 메모리 초과로 죽는 원인이 됐다. segmented_control은 선택값만 반환하는 위젯이라
 # 아래에서 if로 분기해 선택된 섹션 하나만 실행되게 할 수 있다 - 탭처럼 보이면서도 지연 로딩된다.
+st.markdown('<div class="eyebrow">ShipHub · Production Intelligence</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-title">경량 3D 뷰어 파이프라인이 만드는 데이터, 그걸로 하는 예측</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="hero-sub">ShipHub 3D 뷰어가 IFC/DXF 원본을 glTF+LOD로 압축할 때 남기는 형상 복잡도 메타데이터'
+    '(삼각형 수·파일 크기)가 아래 머신러닝 모델의 입력이 되고, 그 예측 결과가 실제 부서 업무 시간·비용 절감으로'
+    ' 이어집니다. <b>3D 시각화와 이 대시보드는 하나의 데이터 흐름</b>입니다.</div>',
+    unsafe_allow_html=True,
+)
+
+
 active_section = st.segmented_control("섹션", SECTIONS, default=SECTIONS[0], label_visibility="collapsed")
 if active_section is None:
     active_section = SECTIONS[0]
@@ -555,25 +584,35 @@ if active_section == SECTIONS[0]:
 
     source_doc = pd.DataFrame([
         ("ship_type / vessel_id (척수)", "🔵 실제 자료 캘리브레이션",
-         "2026년 삼성중공업 실제 상선 수주 공시(LNG 14척·VLCC 12척·가스운반선 4척·컨테이너선 2척·에탄운반선 2척, 뉴스핌·edaily 보도) × 평균 건조기간(2~3년)으로 '동시 건조 규모' 확장 추정"),
+         "2026년 삼성중공업 실제 상선 수주 공시(LNG 14척·VLCC 12척·가스운반선 4척·컨테이너선 2척·에탄운반선 2척) × 평균 건조기간(2~3년)으로 '동시 건조 규모' 확장 추정",
+         "https://dart.fss.or.kr/dsab001/main.do"),
         ("contract_value_krw", "🔵 실제 자료 캘리브레이션",
-         "실제 계약 공시(LNG운반선 1척 3,855억원, 2026-06) + 선종별 최근 시장가 근거"),
-        ("지체상금 회피가치 계산식 (히어로 섹션)", "🟢 실제 공시 자료",
-         "지체상금 = 계약금액 × 0.13%/일 — 지자체 계약 시행규칙상 법정 표준요율을 그대로 사용 (가정 없음)"),
+         "실제 계약 공시(LNG운반선 1척 3,855억원, 2026-06) + 선종별 최근 시장가 근거",
+         "https://www.news1.kr/industry/general-industry/6190219"),
+        ("지체상금 회피가치 계산식 (히어로 섹션)", "🔵 실제 자료 캘리브레이션",
+         "0.13%/일 자체는 실제 법정 요율(지방계약법 시행규칙 제75조)이지만, 이건 지자체가 발주자인 공공계약에 적용되는 규정이다. "
+         "삼성중공업의 실제 선박 계약은 민간 선사와 맺는 상업계약이고 그 지체상금 요율은 비공개(영업비밀)라 참고할 공식 수치가 없다 — "
+         "그래서 공개된 공공계약 표준요율을 '민간 조선 계약에도 유사하게 적용될 것'이라는 가정 하에 대리 지표(proxy)로 차용했다",
+         "https://lbox.kr/v2/statute/%EC%A7%80%EB%B0%A9%EC%9E%90%EC%B9%98%EB%8B%A8%EC%B2%B4%EB%A5%BC%EB%8B%B9%EC%82%AC%EC%9E%90%EB%A1%9C%ED%95%98%EB%8A%94%EA%B3%84%EC%95%BD%EC%97%90%EA%B4%80%ED%95%9C%EB%B2%95%EB%A5%A0%EC%8B%9C%ED%96%89%EA%B7%9C%EC%B9%99/%EB%B3%B8%EB%AC%B8%20%3E%20%EC%A0%9C5%EC%9E%A5%20%3E%20%EC%A0%9C75%EC%A1%B0"),
         ("전사 확산 헤드카운트 기본값 3,800명", "🔵 실제 자료 캘리브레이션",
-         "DART 2023 사업보고서 실제 임직원수 9,640명 × 설계/생산 엔지니어링 비중 40% 가정"),
+         "DART 2023 사업보고서 실제 임직원수 9,640명 × 설계/생산 엔지니어링 비중 40% 가정",
+         "https://kind.krx.co.kr/common/disclsviewer.do?method=searchInitInfo&acptNo=20240313002136"),
         ("5년 중량 CAD 라이선스 TCO 8,000만원", "🔵 실제 자료 캘리브레이션",
-         "Siemens NX 공급사 발표 가격(기본형 시트당 약 $9,000 + 연 유지보수 20%) 기준 5년 보유비용 산정"),
+         "Siemens NX 공급사 발표 가격(기본형 시트당 약 $9,000 + 연 유지보수 20%) 기준 5년 보유비용 산정",
+         "https://community.sw.siemens.com/s/question/0D5KZ000000b5bg0AA/nx-annual-maintenance-fee"),
         ("department 시급(hourly_cost_krw)", "⚪ 통계적 가정",
-         "직급/부서별 실무 엔지니어 시급 참고 수준의 가정 — 통계청/고용노동부 공시 데이터와 직접 연결되지는 않음(정직하게 명시)"),
+         "직급/부서별 실무 엔지니어 시급 참고 수준의 가정 — 통계청/고용노동부 공시 데이터와 직접 연결되지는 않음(정직하게 명시)", None),
         ("triangle_count 분포", "⚪ 통계적 가정",
-         "CAD/BIM 업계 벤치마크(1~2M 삼각형에서 통합GPU 버벅임 시작, Draco 압축이 70~95% 절감) 기준 lognormal 분포로 '압축 후 출력값'다운 규모·왜도 설정"),
-        ("file_size_mb", "⚪ 통계적 가정", "triangle_count에 비례 + 노이즈 (형상 복잡도와 파일 크기의 실제 상관관계 모사)"),
+         "CAD/BIM 업계 벤치마크(1~2M 삼각형에서 통합GPU 버벅임 시작, Draco 압축이 70~95% 절감) 기준 lognormal 분포로 '압축 후 출력값'다운 규모·왜도 설정", None),
+        ("file_size_mb", "⚪ 통계적 가정", "triangle_count에 비례 + 노이즈 (형상 복잡도와 파일 크기의 실제 상관관계 모사)", None),
         ("delay_days / qa_defect_count", "⚪ 통계적 가정",
-         "'형상이 복잡할수록 공정 지연·QA 결함 확률이 커진다'는 조선 실무 통념을 lognormal + 조건부 규칙으로 생성 — 롱테일(가끔 크게 지연) 형태까지 반영"),
-        ("block_name / created_at", "⚪ 통계적 가정", "식별자 규칙 생성, 최근 180일 균등 분산 — 값 자체에 실무적 의미 없음"),
-    ], columns=["대상", "등급", "근거"])
-    st.dataframe(source_doc, hide_index=True, use_container_width=True)
+         "'형상이 복잡할수록 공정 지연·QA 결함 확률이 커진다'는 조선 실무 통념을 lognormal + 조건부 규칙으로 생성 — 롱테일(가끔 크게 지연) 형태까지 반영", None),
+        ("block_name / created_at", "⚪ 통계적 가정", "식별자 규칙 생성, 최근 180일 균등 분산 — 값 자체에 실무적 의미 없음", None),
+    ], columns=["대상", "등급", "근거", "출처 링크"])
+    st.dataframe(
+        source_doc, hide_index=True, use_container_width=True,
+        column_config={"출처 링크": st.column_config.LinkColumn(display_text="열기 ↗")},
+    )
     st.caption(
         "왜 이렇게 혼합했나: 회귀 문제 특성상 예측 타깃(`delay_days`)과 입력(`triangle_count` 등)의 관계 자체는 "
         "내가 생성 규칙으로 주입한 것이라, 모델이 그 규칙을 '재발견'하는 것은 엄밀히는 순환논리라는 한계가 있다. "
@@ -848,7 +887,7 @@ if active_section == SECTIONS[3]:
             with col_slot:
                 fig_h, ax_h = plt.subplots(figsize=(4, 3))
                 sns.histplot(fdf[col_name].dropna(), kde=True, ax=ax_h, color="#60a5fa")
-                ax_h.set_title(col_name, fontsize=10)
+                ax_h.set_title(COL_LABELS_KO.get(col_name, col_name), fontsize=10)
                 ax_h.set_xlabel("")
                 st.pyplot(fig_h)
                 plt.close(fig_h)
@@ -871,11 +910,22 @@ if active_section == SECTIONS[3]:
 
     st.subheader("변수별 분포 (범주형 - 빈도)")
     st.code("for col in cat_cols: sns.countplot(x=col, data=df)", language="python")
-    cat_cols_row = st.columns(len(CATEGORICAL_COLS))
-    for col_slot, col_name in zip(cat_cols_row, CATEGORICAL_COLS):
-        with col_slot:
-            st.caption(f"{col_name}")
-            st.bar_chart(fdf[col_name].value_counts())
+    # 세로 막대 + 긴 한글 라벨 조합은 라벨이 90도로 눕게 되어 읽기 불편하므로(고개를 돌려야 함),
+    # 가로 막대(barh)로 바꿔 라벨이 항상 눕지 않고 가로로 읽히게 한다.
+    cat_cols_row = st.columns(2)
+    for i, col_name in enumerate(CATEGORICAL_COLS):
+        with cat_cols_row[i % 2]:
+            vc = fdf[col_name].value_counts()
+            if col_name == "priority":
+                vc.index = vc.index.map(lambda v: PRIORITY_LABELS_KO.get(v, v))
+            vc = vc.sort_values(ascending=True)
+            fig_c, ax_c = plt.subplots(figsize=(5, max(2, 0.5 * len(vc))))
+            ax_c.barh(vc.index.astype(str), vc.values, color="#60a5fa")
+            ax_c.set_title(COL_LABELS_KO.get(col_name, col_name), fontsize=11)
+            ax_c.tick_params(axis="y", labelrotation=0)
+            fig_c.tight_layout()
+            st.pyplot(fig_c)
+            plt.close(fig_c)
 
     balance_lines = []
     for col_name in CATEGORICAL_COLS:
@@ -892,8 +942,11 @@ if active_section == SECTIONS[3]:
     st.subheader("상관관계 히트맵")
     st.code("sns.heatmap(df[num_cols].corr(), annot=True, cmap='RdBu_r')", language="python")
     corr = fdf[NUMERIC_COLS + ["delay_days"]].corr(numeric_only=True)
+    corr_ko = corr.rename(columns=COL_LABELS_KO, index=COL_LABELS_KO)
     fig, ax = plt.subplots(figsize=(7, 5))
-    sns.heatmap(corr, annot=True, fmt=".2f", cmap="RdBu_r", vmin=-1, vmax=1, ax=ax)
+    sns.heatmap(corr_ko, annot=True, fmt=".2f", cmap="RdBu_r", vmin=-1, vmax=1, ax=ax)
+    ax.tick_params(axis="x", labelrotation=30)
+    fig.tight_layout()
     st.pyplot(fig)
     plt.close(fig)
 
@@ -914,18 +967,32 @@ if active_section == SECTIONS[3]:
     c1, c2, c3 = st.columns(3)
     with c1:
         st.subheader("부서별 평균 지연일")
-        dept_delay = fdf.groupby("department")["delay_days"].mean().sort_values(ascending=False)
-        st.bar_chart(dept_delay)
-        st.caption(f"{dept_delay.index[0]}이 평균 {dept_delay.iloc[0]:.2f}일로 가장 지연이 크고, {dept_delay.index[-1]}이 {dept_delay.iloc[-1]:.2f}일로 가장 양호하다.")
+        dept_delay = fdf.groupby("department")["delay_days"].mean().sort_values(ascending=True)
+        fig_d, ax_d = plt.subplots(figsize=(4, max(2, 0.5 * len(dept_delay))))
+        ax_d.barh(dept_delay.index.astype(str), dept_delay.values, color="#60a5fa")
+        ax_d.tick_params(axis="y", labelrotation=0)
+        fig_d.tight_layout()
+        st.pyplot(fig_d)
+        plt.close(fig_d)
+        dept_delay_desc = dept_delay.sort_values(ascending=False)
+        st.caption(f"{dept_delay_desc.index[0]}이 평균 {dept_delay_desc.iloc[0]:.2f}일로 가장 지연이 크고, {dept_delay_desc.index[-1]}이 {dept_delay_desc.iloc[-1]:.2f}일로 가장 양호하다.")
     with c2:
         st.subheader("선종별 블록 수 · 평균 복잡도")
-        ship_tri = fdf.groupby("ship_type")["triangle_count"].mean().sort_values(ascending=False)
-        st.bar_chart(ship_tri)
-        st.caption(f"{ship_tri.index[0]}의 평균 삼각형 수가 가장 많아(약 {ship_tri.iloc[0]:,.0f}개) 형상이 가장 복잡한 선종이다 — 계약금액·난이도계수가 높은 것과 일치하는지 1번 탭과 비교해볼 것.")
+        ship_tri = fdf.groupby("ship_type")["triangle_count"].mean().sort_values(ascending=True)
+        fig_s, ax_s = plt.subplots(figsize=(4, max(2, 0.5 * len(ship_tri))))
+        ax_s.barh(ship_tri.index.astype(str), ship_tri.values, color="#60a5fa")
+        ax_s.tick_params(axis="y", labelrotation=0)
+        fig_s.tight_layout()
+        st.pyplot(fig_s)
+        plt.close(fig_s)
+        ship_tri_desc = ship_tri.sort_values(ascending=False)
+        st.caption(f"{ship_tri_desc.index[0]}의 평균 삼각형 수가 가장 많아(약 {ship_tri_desc.iloc[0]:,.0f}개) 형상이 가장 복잡한 선종이다 — 계약금액·난이도계수가 높은 것과 일치하는지 1번 탭과 비교해볼 것.")
     with c3:
         st.subheader("우선순위별 지연일 분포")
         fig2, ax2 = plt.subplots(figsize=(5, 4))
-        sns.boxplot(x="priority", y="delay_days", data=fdf, order=["High", "Medium", "Low"], ax=ax2)
+        priority_ko = fdf.assign(우선순위=fdf["priority"].map(PRIORITY_LABELS_KO))
+        sns.boxplot(x="우선순위", y="delay_days", data=priority_ko, order=["높음", "보통", "낮음"], ax=ax2)
+        ax2.set_ylabel("지연일수")
         st.pyplot(fig2)
         plt.close(fig2)
         med_high = fdf[fdf["priority"] == "High"]["delay_days"].median()
@@ -957,10 +1024,22 @@ if active_section == SECTIONS[3]:
         cf1, cf2 = st.columns(2)
         with cf1:
             st.caption("선종별 대표 계약금액(원)")
-            st.bar_chart(ship_fin.set_index("ship_type")["계약금액"])
+            s = ship_fin.set_index("ship_type")["계약금액"].sort_values(ascending=True)
+            fig_f1, ax_f1 = plt.subplots(figsize=(4, max(2, 0.5 * len(s))))
+            ax_f1.barh(s.index.astype(str), s.values, color="#60a5fa")
+            ax_f1.tick_params(axis="y", labelrotation=0)
+            fig_f1.tight_layout()
+            st.pyplot(fig_f1)
+            plt.close(fig_f1)
         with cf2:
             st.caption("선종별 척당 평균 지체상금 노출액(원)")
-            st.bar_chart(ship_fin.set_index("ship_type")["지체상금노출액"])
+            s2 = ship_fin.set_index("ship_type")["지체상금노출액"].sort_values(ascending=True)
+            fig_f2, ax_f2 = plt.subplots(figsize=(4, max(2, 0.5 * len(s2))))
+            ax_f2.barh(s2.index.astype(str), s2.values, color="#60a5fa")
+            ax_f2.tick_params(axis="y", labelrotation=0)
+            fig_f2.tight_layout()
+            st.pyplot(fig_f2)
+            plt.close(fig_f2)
 
         top_exposure = ship_fin.sort_values("지체상금노출액", ascending=False).iloc[0]
         st.info(
@@ -1045,8 +1124,26 @@ for name, model in models.items():
         st.subheader("5-2. RandomForest 피처 중요도")
         rf = fitted_reg["RandomForestRegressor"]
         importance = pd.Series(rf.feature_importances_, index=X_full.columns).sort_values(ascending=False).head(10)
-        st.bar_chart(importance)
-        top3 = importance.head(3)
+        # 원핫인코딩된 피처명(예: department_생산관리(가공/건조))은 영어 컬럼명 접두어가 그대로 붙어있어
+        # 읽기 불편하므로, "부서: 생산관리(가공/건조)"처럼 한글 라벨로 바꿔서 보여준다.
+        def format_feature_name(name):
+            if name in COL_LABELS_KO:
+                return COL_LABELS_KO[name]
+            for col in CATEGORICAL_COLS:
+                prefix = col + "_"
+                if name.startswith(prefix):
+                    value = name[len(prefix):]
+                    value = PRIORITY_LABELS_KO.get(value, value)
+                    return f"{COL_LABELS_KO[col]}: {value}"
+            return name
+        importance_ko = importance.rename(index=format_feature_name).sort_values(ascending=True)
+        fig_imp, ax_imp = plt.subplots(figsize=(7, max(3, 0.45 * len(importance_ko))))
+        ax_imp.barh(importance_ko.index.astype(str), importance_ko.values, color="#60a5fa")
+        ax_imp.tick_params(axis="y", labelrotation=0)
+        fig_imp.tight_layout()
+        st.pyplot(fig_imp)
+        plt.close(fig_imp)
+        top3 = importance.rename(index=format_feature_name).head(3)
         st.info(
             "읽는 법: 막대가 길수록 RandomForest가 예측할 때 그 피처를 더 자주/결정적으로 사용했다는 뜻이다 "
             "(트리를 분기시킬 때 그 피처가 오차를 얼마나 줄였는지의 누적 기여도).\n\n"
@@ -1318,15 +1415,6 @@ if active_section == SECTIONS[7]:
                 )
 
 st.divider()
-
-st.markdown('<div class="eyebrow">ShipHub · Production Intelligence</div>', unsafe_allow_html=True)
-st.markdown('<div class="hero-title">경량 3D 뷰어 파이프라인이 만드는 데이터, 그걸로 하는 예측</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="hero-sub">ShipHub 3D 뷰어가 IFC/DXF 원본을 glTF+LOD로 압축할 때 남기는 형상 복잡도 메타데이터'
-    '(삼각형 수·파일 크기)가 아래 머신러닝 모델의 입력이 되고, 그 예측 결과가 실제 부서 업무 시간·비용 절감으로'
-    ' 이어집니다. <b>3D 시각화와 이 대시보드는 하나의 데이터 흐름</b>입니다.</div>',
-    unsafe_allow_html=True,
-)
 
 if len(roi_df):
     latest_month = roi_df["month"].max()
