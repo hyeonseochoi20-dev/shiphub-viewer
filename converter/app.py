@@ -460,122 +460,6 @@ with st.sidebar:
         st.rerun()
     st.caption(f"데이터 소스: {st.session_state.get('data_source', '-')}")
 
-st.markdown('<div class="eyebrow">ShipHub · Production Intelligence</div>', unsafe_allow_html=True)
-st.markdown('<div class="hero-title">경량 3D 뷰어 파이프라인이 만드는 데이터, 그걸로 하는 예측</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="hero-sub">ShipHub 3D 뷰어가 IFC/DXF 원본을 glTF+LOD로 압축할 때 남기는 형상 복잡도 메타데이터'
-    '(삼각형 수·파일 크기)가 아래 머신러닝 모델의 입력이 되고, 그 예측 결과가 실제 부서 업무 시간·비용 절감으로'
-    ' 이어집니다. <b>3D 시각화와 이 대시보드는 하나의 데이터 흐름</b>입니다.</div>',
-    unsafe_allow_html=True,
-)
-
-if len(roi_df):
-    latest_month = roi_df["month"].max()
-    latest = roi_df[roi_df["month"] == latest_month]
-    by_dept = (
-        latest.groupby("department")
-        .agg(
-            sessions=("id", "count"),
-            cost_saved=("cost_saved_krw", "sum"),
-            avg_trad_min=("traditional_load_min", "mean"),
-            avg_lite_sec=("lightweight_load_sec", "mean"),
-        )
-        .reset_index()
-    )
-    monthly_saving = by_dept["cost_saved"].sum()
-    avg_cost_per_session = monthly_saving / by_dept["sessions"].sum() if by_dept["sessions"].sum() else 0
-
-    with st.container(border=True):
-        st.markdown('<div class="card-title">전사 확산 시 예상 효과 (추정)</div>', unsafe_allow_html=True)
-        st.caption(
-            f"단가는 파일럿 {by_dept.shape[0]}개 부서 · {int(by_dept['sessions'].sum())}건/월 실측 데이터에서 검증된 "
-            f"세션당 ₩{avg_cost_per_session:,.0f} 절감을 그대로 사용합니다. 인력 규모 기본값은 삼성중공업 실제 임직원 수 "
-            "9,640명(2023 사업보고서, DART 전자공시) 중 도면/형상 검토 업무 비중을 40%로 가정한 값입니다. "
-            "슬라이더를 움직이면 전사 확산 규모에 따라 즉시 재계산됩니다."
-        )
-
-        s1, s2, s3, s4 = st.columns(4)
-        eng_headcount = s1.slider("엔지니어링·생산관리 인력", 500, 9640, 3800, step=100)
-        reviews_per_day = s2.slider("1인당 일평균 검토 횟수", 1, 5, 2)
-        working_days = s3.slider("월 근무일수", 18, 26, 22)
-        cad_license_price = s4.slider("중량 CAD 라이선스 5년 TCO(원/카피)", 20_000_000, 150_000_000, 80_000_000, step=5_000_000)
-
-        enterprise_sessions = eng_headcount * reviews_per_day * working_days
-        enterprise_monthly_saving = enterprise_sessions * avg_cost_per_session
-        enterprise_annual_saving = enterprise_monthly_saving * 12
-
-        replace_ratio = st.slider("검토 전용 인력 중 '풀 CAD 라이선스 → 경량 뷰어' 대체 비율", 0, 100, 40, format="%d%%")
-        license_avoided = eng_headcount * (replace_ratio / 100) * cad_license_price
-
-        hero_metric(
-            "연간 절감 + 라이선스 회피 합산",
-            f"₩{enterprise_annual_saving + license_avoided:,.0f}",
-            f"검토 세션 {enterprise_sessions:,.0f}건/월 기준",
-        )
-        e1, e2 = st.columns(2)
-        e1.metric("전사 연간 검토시간 절감액(추정)", f"₩{enterprise_annual_saving:,.0f}")
-        e2.metric("회피된 CAD 라이선스 비용(추정)", f"₩{license_avoided:,.0f}")
-
-        st.caption(
-            "참고: Siemens NX 롤 기반 라이선스는 기본형 시트당 약 $9,000 + 연 유지보수 20%로 공개되어 있으나(공급사 발표 기준), "
-            "조선업 실무에서 쓰는 CAD+CAM+CAE 통합 엔터프라이즈 구성은 비공개 협상가로 이보다 수 배 높은 것이 일반적입니다. "
-            "위 슬라이더의 8,000만원은 '5년 보유비용(TCO)' 관점의 추정 범위이며, 설계 변경 없이 형상만 확인하면 되는 "
-            "검토 전용 인력까지 전부 풀 라이선스를 지급할 필요가 없어 경량 glTF+LOD 뷰어로 대체하는 흐름이 실제 업계 트렌드입니다."
-        )
-
-    if "contract_value_krw" in raw_df.columns:
-        DELAY_PENALTY_RATE = 0.0013  # 0.13%/일 - 지방자치단체를 당사자로 하는 계약에 관한 법률 시행규칙상 지체상금 표준요율
-        vessel_delay = (
-            raw_df.groupby(["vessel_id", "ship_type", "contract_value_krw"])["delay_days"]
-            .mean()
-            .reset_index()
-        )
-        vessel_delay["exposure_krw"] = (
-            vessel_delay["contract_value_krw"] * DELAY_PENALTY_RATE * vessel_delay["delay_days"].clip(lower=0)
-        )
-        total_exposure = vessel_delay["exposure_krw"].sum()
-        total_contract_value = vessel_delay["contract_value_krw"].sum()
-
-        with st.container(border=True):
-            st.markdown('<div class="card-title">조기 지연 예측의 계약적 가치 — 지체상금 회피</div>', unsafe_allow_html=True)
-            st.caption(
-                f"현재 {vessel_delay.shape[0]}척(선종별 계약금액은 2026년 실제 SHI 수주 공시·시장가 기준, "
-                "1번 탭 데이터 정의 참고)의 평균 블록 지연일수를 지체상금 법정 표준요율(계약금액 × 0.13%/일)로 "
-                "환산한 노출액입니다. 이 대시보드의 지연 예측 모델(5번 탭 회귀 모델)로 조기에 잡아낼 수 있는 지연 "
-                "비율을 슬라이더로 조절해보세요."
-            )
-            prevent_ratio = st.slider("조기 예측으로 방지 가능한 지연 비율", 0, 100, 30, format="%d%%")
-            prevented_value = total_exposure * (prevent_ratio / 100)
-
-            hero_metric(
-                f"조기예측 방지 가치 ({prevent_ratio}%)",
-                f"₩{prevented_value:,.0f}",
-                f"전체 노출액 ₩{total_exposure:,.0f} 중",
-            )
-            p1, p2 = st.columns(2)
-            p1.metric("전체 지체상금 노출액", f"₩{total_exposure:,.0f}")
-            p2.metric("계약금액 대비 노출 비율", f"{(total_exposure / total_contract_value * 100):.3f}%" if total_contract_value else "-")
-
-    with st.expander("파일럿 실측 데이터 상세 보기"):
-        annual_saving = monthly_saving * 12
-        roi_pct = (annual_saving - DEV_COST_KRW) / DEV_COST_KRW * 100
-        payback_months = DEV_COST_KRW / monthly_saving if monthly_saving else None
-
-        k1, k2, k3, k4 = st.columns(4)
-        k1.metric("파일럿 연간 절감액(실측)", f"₩{annual_saving:,.0f}")
-        k2.metric("파일럿 ROI", f"{roi_pct:.1f}%")
-        k3.metric("투자회수기간", f"{payback_months:.1f}개월" if payback_months else "-")
-        k4.metric("평균 리뷰 로딩시간", f"{by_dept['avg_trad_min'].mean():.1f}분 → {by_dept['avg_lite_sec'].mean():.1f}초")
-
-        c1, c2 = st.columns([1.3, 1])
-        with c1:
-            st.caption(f"{latest_month} 기준 · 월별 절감액 추이 (부서 순차 온보딩 → 정상 가동 램프업)")
-            trend = roi_df.groupby("month")["cost_saved_krw"].sum()
-            st.line_chart(trend)
-        with c2:
-            st.caption("부서별 이번 달 절감액")
-            st.bar_chart(by_dept.set_index("department")["cost_saved"])
-
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
     ["1. 데이터 정의", "2. 데이터 준비", "3. 데이터 전처리", "4. 데이터 분석(EDA)", "5. 학습·예측·평가", "6. 성능 향상", "7. 실시간 예측", "8. 기술 스택"]
 )
@@ -1423,3 +1307,122 @@ with tab8:
                     pd.DataFrame(items, columns=["구성", "역할"]),
                     hide_index=True, use_container_width=True,
                 )
+
+st.divider()
+
+st.markdown('<div class="eyebrow">ShipHub · Production Intelligence</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-title">경량 3D 뷰어 파이프라인이 만드는 데이터, 그걸로 하는 예측</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="hero-sub">ShipHub 3D 뷰어가 IFC/DXF 원본을 glTF+LOD로 압축할 때 남기는 형상 복잡도 메타데이터'
+    '(삼각형 수·파일 크기)가 아래 머신러닝 모델의 입력이 되고, 그 예측 결과가 실제 부서 업무 시간·비용 절감으로'
+    ' 이어집니다. <b>3D 시각화와 이 대시보드는 하나의 데이터 흐름</b>입니다.</div>',
+    unsafe_allow_html=True,
+)
+
+if len(roi_df):
+    latest_month = roi_df["month"].max()
+    latest = roi_df[roi_df["month"] == latest_month]
+    by_dept = (
+        latest.groupby("department")
+        .agg(
+            sessions=("id", "count"),
+            cost_saved=("cost_saved_krw", "sum"),
+            avg_trad_min=("traditional_load_min", "mean"),
+            avg_lite_sec=("lightweight_load_sec", "mean"),
+        )
+        .reset_index()
+    )
+    monthly_saving = by_dept["cost_saved"].sum()
+    avg_cost_per_session = monthly_saving / by_dept["sessions"].sum() if by_dept["sessions"].sum() else 0
+
+    with st.container(border=True):
+        st.markdown('<div class="card-title">전사 확산 시 예상 효과 (추정)</div>', unsafe_allow_html=True)
+        st.caption(
+            f"단가는 파일럿 {by_dept.shape[0]}개 부서 · {int(by_dept['sessions'].sum())}건/월 실측 데이터에서 검증된 "
+            f"세션당 ₩{avg_cost_per_session:,.0f} 절감을 그대로 사용합니다. 인력 규모 기본값은 삼성중공업 실제 임직원 수 "
+            "9,640명(2023 사업보고서, DART 전자공시) 중 도면/형상 검토 업무 비중을 40%로 가정한 값입니다. "
+            "슬라이더를 움직이면 전사 확산 규모에 따라 즉시 재계산됩니다."
+        )
+
+        s1, s2, s3, s4 = st.columns(4)
+        eng_headcount = s1.slider("엔지니어링·생산관리 인력", 500, 9640, 3800, step=100)
+        reviews_per_day = s2.slider("1인당 일평균 검토 횟수", 1, 5, 2)
+        working_days = s3.slider("월 근무일수", 18, 26, 22)
+        cad_license_price = s4.slider("중량 CAD 라이선스 5년 TCO(원/카피)", 20_000_000, 150_000_000, 80_000_000, step=5_000_000)
+
+        enterprise_sessions = eng_headcount * reviews_per_day * working_days
+        enterprise_monthly_saving = enterprise_sessions * avg_cost_per_session
+        enterprise_annual_saving = enterprise_monthly_saving * 12
+
+        replace_ratio = st.slider("검토 전용 인력 중 '풀 CAD 라이선스 → 경량 뷰어' 대체 비율", 0, 100, 40, format="%d%%")
+        license_avoided = eng_headcount * (replace_ratio / 100) * cad_license_price
+
+        hero_metric(
+            "연간 절감 + 라이선스 회피 합산",
+            f"₩{enterprise_annual_saving + license_avoided:,.0f}",
+            f"검토 세션 {enterprise_sessions:,.0f}건/월 기준",
+        )
+        e1, e2 = st.columns(2)
+        e1.metric("전사 연간 검토시간 절감액(추정)", f"₩{enterprise_annual_saving:,.0f}")
+        e2.metric("회피된 CAD 라이선스 비용(추정)", f"₩{license_avoided:,.0f}")
+
+        st.caption(
+            "참고: Siemens NX 롤 기반 라이선스는 기본형 시트당 약 $9,000 + 연 유지보수 20%로 공개되어 있으나(공급사 발표 기준), "
+            "조선업 실무에서 쓰는 CAD+CAM+CAE 통합 엔터프라이즈 구성은 비공개 협상가로 이보다 수 배 높은 것이 일반적입니다. "
+            "위 슬라이더의 8,000만원은 '5년 보유비용(TCO)' 관점의 추정 범위이며, 설계 변경 없이 형상만 확인하면 되는 "
+            "검토 전용 인력까지 전부 풀 라이선스를 지급할 필요가 없어 경량 glTF+LOD 뷰어로 대체하는 흐름이 실제 업계 트렌드입니다."
+        )
+
+    if "contract_value_krw" in raw_df.columns:
+        DELAY_PENALTY_RATE = 0.0013  # 0.13%/일 - 지방자치단체를 당사자로 하는 계약에 관한 법률 시행규칙상 지체상금 표준요율
+        vessel_delay = (
+            raw_df.groupby(["vessel_id", "ship_type", "contract_value_krw"])["delay_days"]
+            .mean()
+            .reset_index()
+        )
+        vessel_delay["exposure_krw"] = (
+            vessel_delay["contract_value_krw"] * DELAY_PENALTY_RATE * vessel_delay["delay_days"].clip(lower=0)
+        )
+        total_exposure = vessel_delay["exposure_krw"].sum()
+        total_contract_value = vessel_delay["contract_value_krw"].sum()
+
+        with st.container(border=True):
+            st.markdown('<div class="card-title">조기 지연 예측의 계약적 가치 — 지체상금 회피</div>', unsafe_allow_html=True)
+            st.caption(
+                f"현재 {vessel_delay.shape[0]}척(선종별 계약금액은 2026년 실제 SHI 수주 공시·시장가 기준, "
+                "1번 탭 데이터 정의 참고)의 평균 블록 지연일수를 지체상금 법정 표준요율(계약금액 × 0.13%/일)로 "
+                "환산한 노출액입니다. 이 대시보드의 지연 예측 모델(5번 탭 회귀 모델)로 조기에 잡아낼 수 있는 지연 "
+                "비율을 슬라이더로 조절해보세요."
+            )
+            prevent_ratio = st.slider("조기 예측으로 방지 가능한 지연 비율", 0, 100, 30, format="%d%%")
+            prevented_value = total_exposure * (prevent_ratio / 100)
+
+            hero_metric(
+                f"조기예측 방지 가치 ({prevent_ratio}%)",
+                f"₩{prevented_value:,.0f}",
+                f"전체 노출액 ₩{total_exposure:,.0f} 중",
+            )
+            p1, p2 = st.columns(2)
+            p1.metric("전체 지체상금 노출액", f"₩{total_exposure:,.0f}")
+            p2.metric("계약금액 대비 노출 비율", f"{(total_exposure / total_contract_value * 100):.3f}%" if total_contract_value else "-")
+
+    with st.expander("파일럿 실측 데이터 상세 보기"):
+        annual_saving = monthly_saving * 12
+        roi_pct = (annual_saving - DEV_COST_KRW) / DEV_COST_KRW * 100
+        payback_months = DEV_COST_KRW / monthly_saving if monthly_saving else None
+
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("파일럿 연간 절감액(실측)", f"₩{annual_saving:,.0f}")
+        k2.metric("파일럿 ROI", f"{roi_pct:.1f}%")
+        k3.metric("투자회수기간", f"{payback_months:.1f}개월" if payback_months else "-")
+        k4.metric("평균 리뷰 로딩시간", f"{by_dept['avg_trad_min'].mean():.1f}분 → {by_dept['avg_lite_sec'].mean():.1f}초")
+
+        c1, c2 = st.columns([1.3, 1])
+        with c1:
+            st.caption(f"{latest_month} 기준 · 월별 절감액 추이 (부서 순차 온보딩 → 정상 가동 램프업)")
+            trend = roi_df.groupby("month")["cost_saved_krw"].sum()
+            st.line_chart(trend)
+        with c2:
+            st.caption("부서별 이번 달 절감액")
+            st.bar_chart(by_dept.set_index("department")["cost_saved"])
+
