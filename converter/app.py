@@ -1503,6 +1503,33 @@ if len(roi_df):
             p1.metric("전체 지체상금 노출액", f"₩{total_exposure:,.0f}")
             p2.metric("계약금액 대비 노출 비율", f"{(total_exposure / total_contract_value * 100):.3f}%" if total_contract_value else "-")
 
+        # 지체상금 회피는 "지연을 안 만드는" 하방 리스크 계산이고, 여기는 그 대칭 개념 — 검토 주기가
+        # 빨라진 만큼 계획 대비 더 일찍 인도하면 선주는 그만큼 일찍 용선 영업을 시작해 영업이익이
+        # 늘어나고(반사이익), 실제 조선 계약에도 이를 조선사에 보상하는 조기인도 보너스 조항이 있다.
+        EARLY_DELIVERY_BONUS_RATE = 0.0003  # 0.03%/일 - 해외 표준 조기완공 보너스 조항의 전형적 요율(계약금액의 최대 5% 한도가 관행)
+        EARLY_DELIVERY_BONUS_CAP = 0.05  # 계약금액의 5% - 동일 관행상 상한
+        with st.container(border=True):
+            st.markdown('<div class="card-title">조기인도 반사이익 — 지체상금 회피의 대칭 개념</div>', unsafe_allow_html=True)
+            st.caption(
+                "지체상금 회피가 '지연을 막아서 손해를 안 보는' 하방 계산이라면, 이건 그 반대 — 검토·QA 주기가 "
+                "짧아진 만큼 계획보다 며칠 더 일찍 인도하면 선주는 그만큼 일찍 용선 영업을 시작해 매출이 생기고, "
+                "이 반사이익 중 일부는 실제 조선 계약의 조기인도 보너스(early delivery bonus) 조항으로 조선사에도 "
+                "돌아온다. 요율은 해외 표준 조기완공 보너스 조항의 전형적 값(계약금액의 0.03%/일, 5% 한도)을 "
+                "차용했다 — 국내 조선 계약의 실제 조기인도 보너스 요율은 지체상금과 마찬가지로 비공개다."
+            )
+            early_days = st.slider("검토 효율화로 앞당길 수 있는 인도일수(척당 평균)", 0, 15, 3, format="%d일")
+            vessel_delay["early_bonus_krw"] = (
+                (vessel_delay["contract_value_krw"] * EARLY_DELIVERY_BONUS_RATE * early_days)
+                .clip(upper=vessel_delay["contract_value_krw"] * EARLY_DELIVERY_BONUS_CAP)
+            )
+            total_early_bonus = vessel_delay["early_bonus_krw"].sum()
+
+            hero_metric(
+                f"조기인도 반사이익 ({early_days}일 단축 가정)",
+                f"₩{total_early_bonus:,.0f}",
+                f"{vessel_delay.shape[0]}척 합산 · 척당 계약금액의 0.03%/일 (5% 한도)",
+            )
+
     with st.expander("파일럿 실측 데이터 상세 보기"):
         annual_saving = monthly_saving * 12
         roi_pct = (annual_saving - DEV_COST_KRW) / DEV_COST_KRW * 100
