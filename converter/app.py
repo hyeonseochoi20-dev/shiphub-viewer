@@ -475,7 +475,7 @@ if active_section == SECTIONS[0]:
 (LNG운반선 14척·원유운반선 12척·가스운반선 4척·컨테이너선 2척·에탄운반선 2척, 뉴스핌·edaily 등 보도)와
 평균 건조기간(약 2~3년)을 반영해 "현재 동시 건조 중" 규모로 확장 추정했고, 선종별 계약금액도 실제 공시
 (LNG운반선 1척 3,855억원, 2026-06)와 최근 시장가를 근거로 설정했다 — 아래 `contract_value_krw`는
-3번 탭의 지체상금(계약 지연배상금, 법정 표준요율 0.13%/일) 회피 가치 계산에 쓰인다.
+3번 탭의 인도 지연 리스크(면책기간 소진율) 산출과 선종별 규모 비교에 쓰인다.
 """)
     col_doc = pd.DataFrame([
         ("ship_type", "object", "선종 (LNG운반선/VLCC/가스운반선/컨테이너선/에탄운반선/해양플랜트)"),
@@ -535,10 +535,11 @@ if active_section == SECTIONS[0]:
         ("contract_value_krw", "🔵 실제 자료 캘리브레이션",
          "실제 계약 공시(LNG운반선 1척 3,855억원, 2026-06) + 선종별 최근 시장가 근거",
          "https://www.news1.kr/industry/general-industry/6190219"),
-        ("지체상금 회피가치 계산식 (히어로 섹션)", "🔵 실제 자료 캘리브레이션",
-         "0.13%/일 자체는 실제 법정 요율(지방계약법 시행규칙 제75조)이지만, 이건 지자체가 발주자인 공공계약에 적용되는 규정이다. "
-         "삼성중공업의 실제 선박 계약은 민간 선사와 맺는 상업계약이고 그 지체상금 요율은 비공개(영업비밀)라 참고할 공식 수치가 없다 — "
-         "그래서 공개된 공공계약 표준요율을 '민간 조선 계약에도 유사하게 적용될 것'이라는 가정 하에 대리 지표(proxy)로 차용했다",
+        ("인도 지연 리스크 지표 (3번 탭)", "🟡 업계 표준 계약구조 기반",
+         "상선 건조계약은 계약금액에 정률을 곱하는 구조가 아니다. SAJ Form(일본조선공업회) · NEWBUILDCON(BIMCO) 등 "
+         "업계 표준 양식은 ① 인도 지연 30일까지는 배상금 없음(면책기간) ② 이후 협상된 일당 정액 ③ 누적 180~210일 초과 시 "
+         "선주의 계약 해제권 발생, 이 3단 구조를 쓴다. 일당 정액은 계약마다 비공개라, 금액 대신 '면책기간을 얼마나 소진했는가'를 지표로 삼았다. "
+         "정률이 필요한 방산·특수선은 국가계약법 시행규칙 제75조(물품 제조 0.075%/일)가 적용된다",
          "https://lbox.kr/v2/statute/%EC%A7%80%EB%B0%A9%EC%9E%90%EC%B9%98%EB%8B%A8%EC%B2%B4%EB%A5%BC%EB%8B%B9%EC%82%AC%EC%9E%90%EB%A1%9C%ED%95%98%EB%8A%94%EA%B3%84%EC%95%BD%EC%97%90%EA%B4%80%ED%95%9C%EB%B2%95%EB%A5%A0%EC%8B%9C%ED%96%89%EA%B7%9C%EC%B9%99/%EB%B3%B8%EB%AC%B8%20%3E%20%EC%A0%9C5%EC%9E%A5%20%3E%20%EC%A0%9C75%EC%A1%B0"),
         ("전사 확산 헤드카운트 기본값 3,800명", "🔵 실제 자료 캘리브레이션",
          "DART 2023 사업보고서 실제 임직원수 9,640명 × 설계/생산 엔지니어링 비중 40% 가정",
@@ -573,9 +574,13 @@ if active_section == SECTIONS[1]:
     section("02", "데이터 준비", "정규화 스키마 · JOIN 쿼리 · df.head() / shape / describe() / info()")
 
     with st.container(border=True):
-        st.markdown('<div class="card-title">스키마 설계 (개념적 → 논리적 → 물리적) — ERD (Barker 표기법)</div>', unsafe_allow_html=True)
-        st.caption("실선+까마귀발=필수·다수, 점선=선택 · fact_* 테이블은 FK가 전부 NOT NULL(필수), dim_* 쪽은 자식 0개 가능(선택)")
-        st.markdown(ERD_SVG_BARKER, unsafe_allow_html=True)
+        st.markdown('<div class="card-title">스키마 설계 (개념적 → 논리적 → 물리적) — ERD (IE 까마귀발 표기법)</div>', unsafe_allow_html=True)
+        st.caption("세로 눈금(|)=1쪽, 까마귀발(≺)=N쪽 · DIM은 잘 변하지 않는 기준 정보, FACT는 계속 쌓이는 사건 기록")
+        _erd = BASE / "assets" / "erd.png"
+        if _erd.exists():
+            st.image(str(_erd), use_container_width=True)
+        else:
+            st.markdown(ERD_SVG_BARKER, unsafe_allow_html=True)
 
     st.markdown("실제 JOIN 쿼리 (4개 테이블을 조인해서 분석용 평탄화 테이블을 만든다)")
     st.code(f"""
@@ -959,40 +964,66 @@ if active_section == SECTIONS[3]:
         )
 
     if "contract_value_krw" in fdf.columns:
-        st.subheader("선종별 계약금액 · 지체상금 노출액")
-        st.caption("계약금액은 1번 탭 출처 참고 · 지체상금 = 계약금액 × 0.13%/일(법정 표준요율) × 평균 지연일수")
-        ship_fin = (
-            fdf.groupby("ship_type")
-            .agg(계약금액=("contract_value_krw", "mean"), 평균지연일=("delay_days", "mean"))
-            .reset_index()
+        st.subheader("선종별 계약 규모 · 인도 지연 리스크")
+        st.caption(
+            "상선 건조계약(SAJ Form 등 업계 표준 양식)은 '계약금액 × 정률'이 아니라 "
+            "면책기간 30일 → 일당 정액 → 180일 초과 시 선주 해제권의 3단 구조다. "
+            "일당 정액은 계약마다 비공개이므로 금액 대신 면책기간 소진율로 본다. "
+            "아래 값은 공정 단계별 최대 지연을 모두 더한 것으로, 일정 버퍼와 단계 중첩이 "
+            "전혀 없다고 가정한 **상한**이다 — 절대 수준보다 선종 간 순위를 읽는 지표다."
         )
-        ship_fin["지체상금노출액"] = ship_fin["계약금액"] * 0.0013 * ship_fin["평균지연일"].clip(lower=0)
+        GRACE_DAYS, CANCEL_DAYS = 30, 180
+        # 척별 인도 지연 근사 — 같은 공정 안의 블록은 병행되므로 공정별 최대 지연만 인도에
+        # 전이된다고 보고, 그 값을 공정 단계에 걸쳐 더한다(크리티컬 패스 근사).
+        per_stage = (
+            fdf.groupby(["ship_type", "vessel_id", "process_stage"])["delay_days"]
+            .max().clip(lower=0).reset_index()
+        )
+        per_vessel = (
+            per_stage.groupby(["ship_type", "vessel_id"])["delay_days"].sum().reset_index()
+            .rename(columns={"delay_days": "인도지연근사"})
+        )
+        ship_fin = (
+            fdf.groupby("ship_type")["contract_value_krw"].mean().reset_index()
+            .rename(columns={"contract_value_krw": "계약금액"})
+            .merge(per_vessel.groupby("ship_type")["인도지연근사"].mean().reset_index(),
+                   on="ship_type")
+        )
+        ship_fin["면책소진율"] = (ship_fin["인도지연근사"] / GRACE_DAYS * 100).clip(upper=200)
+
         cf1, cf2 = st.columns(2)
         with cf1:
             st.caption("선종별 대표 계약금액(원)")
-            s = ship_fin.set_index("ship_type")["계약금액"].sort_values(ascending=True)
-            fig_f1, ax_f1 = plt.subplots(figsize=(4, max(2, 0.5 * len(s))))
-            ax_f1.barh(s.index.astype(str), s.values, color="#60a5fa")
+            s1 = ship_fin.set_index("ship_type")["계약금액"].sort_values()
+            fig_f1, ax_f1 = plt.subplots(figsize=(4, max(2, 0.5 * len(s1))))
+            ax_f1.barh(s1.index.astype(str), s1.values, color="#60a5fa")
             ax_f1.tick_params(axis="y", labelrotation=0)
             fig_f1.tight_layout()
             st.pyplot(fig_f1)
             plt.close(fig_f1)
         with cf2:
-            st.caption("선종별 척당 평균 지체상금 노출액(원)")
-            s2 = ship_fin.set_index("ship_type")["지체상금노출액"].sort_values(ascending=True)
+            st.caption(f"선종별 면책기간({GRACE_DAYS}일) 소진율 — 버퍼 0 가정 상한, 순위 비교용")
+            s2 = ship_fin.set_index("ship_type")["면책소진율"].sort_values()
             fig_f2, ax_f2 = plt.subplots(figsize=(4, max(2, 0.5 * len(s2))))
-            ax_f2.barh(s2.index.astype(str), s2.values, color="#60a5fa")
+            cols = ["#ef4444" if v >= 100 else "#60a5fa" for v in s2.values]
+            ax_f2.barh(s2.index.astype(str), s2.values, color=cols)
+            ax_f2.axvline(100, color="#111827", lw=1, ls="--")
+            ax_f2.set_xlabel("면책기간 소진율(%)")
             ax_f2.tick_params(axis="y", labelrotation=0)
             fig_f2.tight_layout()
             st.pyplot(fig_f2)
             plt.close(fig_f2)
 
-        top_exposure = ship_fin.sort_values("지체상금노출액", ascending=False).iloc[0]
+        top = ship_fin.sort_values("면책소진율", ascending=False).iloc[0]
+        bot = ship_fin.sort_values("면책소진율").iloc[0]
         st.info(
-            f"시사점: 왼쪽 그래프는 '얼마짜리 배인가'(계약 규모), 오른쪽은 '지금 속도로 계속 지연되면 위약금이 얼마나 쌓이는가'(리스크 금액)다. "
-            f"두 그래프의 순위가 다르다는 게 핵심 — 계약금액이 가장 큰 선종이 꼭 리스크가 가장 큰 선종은 아니다. "
-            f"지금 기준으로는 {top_exposure['ship_type']}의 지체상금 노출액이 가장 커서(척당 약 {top_exposure['지체상금노출액']:,.0f}원), "
-            f"공정 관리 우선순위를 정할 때 '비싼 배'가 아니라 '지연×계약금액이 큰 배'를 먼저 봐야 한다는 근거가 된다."
+            f"시사점: 왼쪽은 '얼마짜리 배인가'(계약 규모), 오른쪽은 '지연이 면책기간을 얼마나 먹는가'(리스크)다. "
+            f"두 순위가 다르다는 게 핵심 — 비싼 배가 곧 위험한 배는 아니다. "
+            f"버퍼 0 가정에서는 {top['ship_type']} {top['면책소진율']:.0f}% ~ {bot['ship_type']} {bot['면책소진율']:.0f}%로 "
+            f"전 선종이 100%를 넘는데, 이는 '현실이 이미 배상금 구간'이라는 뜻이 아니라 "
+            f"**일정 버퍼가 인도 지연을 흡수하고 있다**는 뜻이다. 실무에서 관리해야 할 것은 배상금 자체가 아니라 "
+            f"이 버퍼이며, 버퍼가 먼저 마르는 선종({top['ship_type']})부터 공정을 들여다봐야 한다. "
+            f"누적 {CANCEL_DAYS}일을 넘기면 선주의 계약 해제권이 발생해, 조선소가 실제로 두려워하는 지점은 그쪽이다."
         )
 
     with st.expander("원본 필터 데이터 보기"):

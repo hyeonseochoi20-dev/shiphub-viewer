@@ -8,6 +8,7 @@
 """
 import random
 import sqlite3
+from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -113,6 +114,9 @@ def generate(seed=42):
     init_table(conn)
 
     rng = np.random.default_rng(seed)
+    # QA 판정은 별도 난수 스트림을 쓴다 — 판정 로직을 바꿔도 형상·지연 등
+    # 다른 컬럼의 난수 순서가 흔들리지 않게 하기 위해서다.
+    rng_qa = np.random.default_rng(seed + 977)
     random.seed(seed)
     rows = []
     block_seq = 0
@@ -122,17 +126,28 @@ def generate(seed=42):
             vessel_id = f"{ship_type.split('(')[0]}-{v:02d}"
             n_blocks = int(rng.integers(blk_lo, blk_hi + 1))
 
-            # 같은 척·같은 공정의 블록들은 같은 크레인·도크·인력을 두고 경쟁하므로 지연이 함께
-            # 움직인다. 이 '야드 혼잡도'는 데이터셋 컬럼에 없는 잠재 변수라 회귀가 설명할 수 없는
-            # 몫으로 남는다 - 실제 현장 데이터에서도 이런 그룹 효과가 잔차의 큰 부분을 차지하고,
-            # 이것 때문에 R²가 1에 가까워질 수 없다.
-            yard_load = {s: float(rng.lognormal(0.0, 0.42)) for s in STAGES}
-
+            # 블록별 담당 부서·공정을 먼저 확정한 뒤, 공정별 동시 물량을 센다.
+            assign = []
             for _ in range(n_blocks):
+                d = random.choice(DEPARTMENTS)
+                assign.append((d, random.choice(DEPT_STAGES[d])))
+            stage_cnt = Counter(st for _, st in assign)
+
+            # 같은 척·같은 공정의 블록들은 같은 크레인·도크·인력을 두고 경쟁한다. 이 '야드 혼잡도'를
+            # 순수 난수로 두면 회귀가 손댈 수 없는 몫이 되어버리는데, 실제 조선소는 어느 공정에
+            # 물량이 몰려 있는지 알 수 있다. 그래서 혼잡도를 '그 공정의 동시 물량 / 평균 물량'에
+            # 연동시키고 잔여 변동만 난수로 둔다 - 관측 가능한 부분은 모델이 배울 수 있고,
+            # 나머지만 진짜 노이즈로 남는다.
+            avg_cnt = max(1.0, n_blocks / len(STAGES))
+            yard_load = {
+                s: (stage_cnt.get(s, 0) / avg_cnt) ** 1.6 * float(rng.lognormal(0.0, 0.12))
+                for s in STAGES
+            }
+
+            for bi in range(n_blocks):
                 block_seq += 1
                 block_name = f"{vessel_id}-{random.choice(BLOCK_PREFIXES)}{block_seq:05d}"
-                dept = random.choice(DEPARTMENTS)
-                stage = random.choice(DEPT_STAGES[dept])
+                dept, stage = assign[bi]
                 priority = random.choices(PRIORITIES, weights=[0.2, 0.5, 0.3])[0]
                 prof = STAGE_PROFILE[stage]
 
@@ -153,24 +168,33 @@ def generate(seed=42):
                 # (2배 복잡하다고 결함이 2배가 되지는 않는다). 카운트 변수이므로 푸아송.
                 defect_rate = 0.8 + 5.2 * np.log10(triangle_count / 20000 + 1)
                 qa_defect_count = int(rng.poisson(defect_rate))
-                qa_status = "불합격" if qa_defect_count > 5 else "합격"
+
+                # QA 판정: '결함 N개 이상이면 불합격' 같은 딱 떨어지는 임계값을 쓰면
+                # 판정 결과가 결함 수의 함수가 되어버려, 분류 모델이 그 규칙만 외운다
+                # (데이터 누수). 실제 검사는 결함 건수뿐 아니라 개별 결함의 심각도와
+                # 공정 특성, 검사자 재량이 함께 작용하므로 로지스틱 확률로 판정한다.
+                z = (-3.35 + 0.60 * qa_defect_count
+                     + 0.55 * (prof["rework"] - 1.0)
+                     + 0.45 * float(rng_qa.normal()))
+                p_fail = 1.0 / (1.0 + np.exp(-z))
+                qa_status = "불합격" if rng_qa.random() < p_fail else "합격"
 
                 # --- (2) 재작업: 결함이 나야 비로소 다시 손을 댄다. 결함 1건당 소요가 지수분포라
                 # 몇 건만 겹쳐도 꼬리가 길어진다(복합 푸아송).
                 rework_days = float(
-                    sum(rng.exponential(0.7) for _ in range(qa_defect_count))
+                    sum(rng.gamma(3.0, 0.7 / 3.0) for _ in range(qa_defect_count))
                 ) * prof["rework"]
 
                 # --- (3) 대기: 야드가 혼잡할수록 늘고, 우선순위는 여기에만 작용한다.
                 wait_days = (
                     prof["congestion"] * yard_load[stage]
-                    * PRIORITY_WAIT_MULT[priority] * float(rng.exponential(1.0))
+                    * PRIORITY_WAIT_MULT[priority] * float(rng.gamma(3.0, 1.0 / 3.0))
                 )
 
                 # --- (4) 기상: 옥외 비중이 큰 공정만, 그것도 계절을 탄다.
                 weather_days = (
                     prof["weather"] * season_factor(created_dt.month)
-                    * float(rng.exponential(1.2))
+                    * float(rng.gamma(3.0, 1.2 / 3.0))
                 )
 
                 # --- (5) 계획에 잡아둔 여유: 대부분의 지연은 여기서 흡수되고, 남는 것만 실제
