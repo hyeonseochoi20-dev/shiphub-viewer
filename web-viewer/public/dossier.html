@@ -446,13 +446,16 @@
       <div class="roi-mini">
         <div><div class="k">전사 연간 검토시간 절감액</div><div class="v" id="roiSaving">₩0</div></div>
         <div><div class="k">회피된 CAD 라이선스 비용</div><div class="v" id="roiLicense">₩0</div></div>
-        <div><div class="k">지체상금 회피 가치</div><div class="v" id="roiPrevent">₩0</div></div>
+        <div><div class="k">회피되는 인도 지연</div><div class="v" id="roiPrevent">0일</div></div>
       </div>
       <div class="note-box">
-        <b>지체상금 회피 가치 산정 기준</b> — 실측 53척 · 총 노출액 ₩53,017,845,759(계약금액 × 0.13%/일 ×
-        실측 지연일수). 이 요율(지방계약법 시행규칙 제75조)은 실제 법령이지만 지자체 발주 공공계약
-        표준요율이다 — 민간 조선 계약의 실제 요율은 비공개라 <b>&ldquo;유사 적용된다&rdquo;는 가정</b>이
-        들어간 대리 지표임을 밝혀둔다.
+        <b>인도 지연 산정 기준</b> — 상선 건조계약은 &lsquo;계약금액 × 정률&rsquo; 구조가 아니다.
+        SAJ Form(일본조선공업회) · NEWBUILDCON(BIMCO) 등 업계 표준 양식은
+        <b>면책기간 30일 → 일당 정액 → 180일 초과 시 선주 해제권</b>의 3단 구조를 쓰며,
+        일당 정액은 계약마다 <b>비공개</b>다. 그래서 금액 대신 일수로 표시한다 — 실측 53척의
+        인도 지연 근사 합계는 <b>2,613.6일</b>(척당 평균 49.3일)이다. 공정 단계별 최대 지연을
+        모두 더한 값이라 일정 버퍼와 단계 중첩이 전혀 없다고 가정한 <b>상한</b>이며,
+        절대 수준보다 선종 간 순위를 읽는 지표다.
       </div>
     </div>
   </section>
@@ -643,14 +646,17 @@
   }
 
   // ---- 04 / EVIDENCE: ROI 계산기. Streamlit 대시보드(app.py)의 동일한 계산 로직을 그대로
-  // JS로 옮긴 것 - 기준값(세션당 절감액, 지체상금 노출액 등)은 실제 MariaDB 실측치를 고정값으로 박아넣었다
+  // JS로 옮긴 것 - 기준값(세션당 절감액, 인도 지연 일수 등)은 실제 PostgreSQL 실측치를 고정값으로 박아넣었다
   // (이 페이지는 정적 HTML이라 매 요청마다 DB를 조회하지 않는다. 최신 실측치가 필요하면 Streamlit
   // 대시보드의 "1. 데이터 정의" 탭을 참고할 것).
   (function(){
-    var AVG_COST_PER_SESSION = 20236.64; // 5개 부서 파일럿 실측, 2026-08 기준 월 세션당 절감액
-    var TOTAL_EXPOSURE = 53017845759;    // 53척 지체상금 노출액 합계(계약금액 × 0.13%/일 × 실측 지연일수)
+    var AVG_COST_PER_SESSION = 21576;    // 5개 부서 파일럿 실측(331건), 2026-08 기준 월 세션당 절감액
+    // SAJ Form 구조상 일당 정액이 비공개라 금액이 아닌 일수로 집계한다.
+    // 공정별 최대 지연을 공정에 걸쳐 합산한 크리티컬 패스 근사(53척 합계).
+    var TOTAL_DELAY_DAYS = 2613.6;
 
     var fmtKRW = function(v){ return '₩' + Math.round(v).toLocaleString('ko-KR'); };
+    var fmtDays = function(v){ return Math.round(v).toLocaleString('ko-KR') + '일'; };
 
     var els = {
       headcount: document.getElementById('rngHeadcount'), lblHeadcount: document.getElementById('lblHeadcount'),
@@ -686,12 +692,12 @@
       var monthlySaving = sessions * AVG_COST_PER_SESSION;
       var annualSaving = monthlySaving * 12;
       var licenseAvoided = headcount * (replaceRatio/100) * license;
-      var preventedValue = TOTAL_EXPOSURE * (preventRatio/100);
+      var preventedDays = TOTAL_DELAY_DAYS * (preventRatio/100);
 
       tweenTo(roiHeroEl, annualSaving + licenseAvoided, fmtKRW);
       tweenTo(roiSavingEl, annualSaving, fmtKRW);
       tweenTo(roiLicenseEl, licenseAvoided, fmtKRW);
-      tweenTo(roiPreventEl, preventedValue, fmtKRW);
+      tweenTo(roiPreventEl, preventedDays, fmtDays);
     }
 
     Object.keys(els).forEach(function(k){
