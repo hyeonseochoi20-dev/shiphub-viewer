@@ -11,7 +11,7 @@ scikit-learn>=1.4.0
 matplotlib>=3.7.0
 seaborn>=0.13.0
 streamlit>=1.40.0
-pymysql>=1.1.0
+psycopg[binary]>=3.1
 sqlalchemy>=2.0.0
 
 # MCP 서버 (mcp_server.py) - AI 에이전트가 생산 DB/예측 모델을 도구로 조회

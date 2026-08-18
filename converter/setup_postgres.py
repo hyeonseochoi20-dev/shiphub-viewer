@@ -6,8 +6,8 @@ MariaDB 스키마 생성 + 데이터 적재
   생산 블록 + 리뷰세션 데이터를 정규화된 형태로 채운다.
 
 연결 정보는 환경변수로 오버라이드 가능 (기본값은 로컬 기본 설치 기준):
-  MARIADB_HOST (기본 localhost) / MARIADB_PORT (기본 3306)
-  MARIADB_USER (기본 root) / MARIADB_PASSWORD (기본 빈 문자열)
+  DATABASE_URL (관리형 PostgreSQL이 주는 접속 문자열 하나면 충분)
+  또는 PGHOST / PGPORT / PGUSER / PGPASSWORD / PGDATABASE
 
 실행: python setup_mariadb.py
 """
@@ -18,17 +18,14 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np
-import pymysql
+import psycopg
 
 BASE = Path(__file__).parent
 
-DB_CONFIG = dict(
-    host=os.environ.get("MARIADB_HOST", "localhost"),
-    port=int(os.environ.get("MARIADB_PORT", "3306")),
-    user=os.environ.get("MARIADB_USER", "root"),
-    password=os.environ.get("MARIADB_PASSWORD", ""),
-    charset="utf8mb4",
-)
+from db_url import build_db_url
+
+# psycopg에는 SQLAlchemy 전용 "+psycopg" 접미사가 없는 순수 URL을 넘긴다.
+CONNINFO = build_db_url().replace("postgresql+psycopg://", "postgresql://")
 
 # 삼성중공업 실제 주력 선종 기준 - 척수/계약금액은 2026년 실제 수주 공시를 반영해 구성
 # (선종, 동시 건조 척수, 척당 블록수 범위, 형상 복잡도 배율, 대표 계약금액(원))
@@ -129,40 +126,43 @@ def run_schema(cursor):
 
 
 def main(seed=42):
-    conn = pymysql.connect(**DB_CONFIG)
+    conn = psycopg.connect(CONNINFO)
     try:
         with conn.cursor() as c:
             run_schema(c)
             conn.commit()
 
-            c.execute("USE shiphub")
 
             # --- 차원 테이블 ---
             ship_type_ids = {}
             for name, _, _, mult, contract_value in SHIP_TYPES:
                 c.execute(
-                    "INSERT INTO dim_ship_type (name, complexity_multiplier, contract_value_krw) VALUES (%s, %s, %s)",
+                    "INSERT INTO dim_ship_type (name, complexity_multiplier, contract_value_krw) "
+                    "VALUES (%s, %s, %s) RETURNING ship_type_id",
                     (name, mult, contract_value),
                 )
-                ship_type_ids[name] = c.lastrowid
+                ship_type_ids[name] = c.fetchone()[0]
 
             dept_ids = {}
             for name, cost in DEPARTMENTS:
                 c.execute(
-                    "INSERT INTO dim_department (name, hourly_cost_krw) VALUES (%s, %s)",
+                    "INSERT INTO dim_department (name, hourly_cost_krw) VALUES (%s, %s) RETURNING department_id",
                     (name, cost),
                 )
-                dept_ids[name] = c.lastrowid
+                dept_ids[name] = c.fetchone()[0]
 
             stage_ids = {}
             for name in STAGES:
-                c.execute("INSERT INTO dim_process_stage (name) VALUES (%s)", (name,))
-                stage_ids[name] = c.lastrowid
+                c.execute("INSERT INTO dim_process_stage (name) VALUES (%s) RETURNING stage_id", (name,))
+                stage_ids[name] = c.fetchone()[0]
 
             conn.commit()
 
             # --- 척(dim_vessel) + 생산 블록(fact_production_block) ---
             rng = np.random.default_rng(seed)
+            # QA 판정은 별도 난수 스트림 — 판정 로직을 바꿔도 형상·지연 등
+            # 다른 컬럼의 난수 순서가 흔들리지 않게 하기 위해서다.
+            rng_qa = np.random.default_rng(seed + 977)
             random.seed(seed)
             block_seq = 0
             block_rows = []
@@ -172,10 +172,10 @@ def main(seed=42):
                 for v in range(1, vessel_count + 1):
                     vessel_code = f"{ship_type.split('(')[0]}-{v:02d}"
                     c.execute(
-                        "INSERT INTO dim_vessel (ship_type_id, vessel_code) VALUES (%s, %s)",
+                        "INSERT INTO dim_vessel (ship_type_id, vessel_code) VALUES (%s, %s) RETURNING vessel_id",
                         (st_id, vessel_code),
                     )
-                    vessel_id = c.lastrowid
+                    vessel_id = c.fetchone()[0]
 
                     n_blocks = int(rng.integers(blk_lo, blk_hi + 1))
 

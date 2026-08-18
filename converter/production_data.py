@@ -15,12 +15,9 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-DB_URL = "mysql+pymysql://{user}:{password}@{host}:{port}/shiphub?charset=utf8mb4".format(
-    user=os.environ.get("MARIADB_USER", "root"),
-    password=os.environ.get("MARIADB_PASSWORD", ""),
-    host=os.environ.get("MARIADB_HOST", "localhost"),
-    port=os.environ.get("MARIADB_PORT", "3306"),
-)
+from db_url import build_db_url
+
+DB_URL = build_db_url()
 engine = sa.create_engine(DB_URL, pool_pre_ping=True)
 
 MODEL_NUMERIC_COLS = ["triangle_count", "file_size_mb", "lod_level", "planned_days"]

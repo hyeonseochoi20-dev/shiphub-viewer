@@ -39,18 +39,15 @@ if _FONT_PATH.exists():
     plt.rcParams["font.family"] = fm.FontProperties(fname=str(_FONT_PATH)).get_name()
 plt.rcParams["axes.unicode_minus"] = False  # 한글 폰트 사용 시 마이너스 기호(−)가 깨지는 것 방지
 
-# 교안 68~70p에서 다룬 pymysql/SQLAlchemy 연결 패턴 그대로 사용.
-# 연결 정보는 환경변수로 오버라이드 가능 (setup_mariadb.py와 동일한 기본값).
-# MARIADB_HOST가 아예 설정 안 되어 있으면(예: zip을 풀어서 채점할 때) DB 연결 자체를 시도하지 않고
-# 바로 로컬 CSV로 넘어간다 - 안 그러면 존재하지 않는 localhost:3306에 연결 시도하다 수십 초씩 멈춘다.
-HAS_DB_CONFIG = "MARIADB_HOST" in os.environ
-DB_URL = "mysql+pymysql://{user}:{password}@{host}:{port}/shiphub?charset=utf8mb4".format(
-    user=os.environ.get("MARIADB_USER", "root"),
-    password=os.environ.get("MARIADB_PASSWORD", ""),
-    host=os.environ.get("MARIADB_HOST", "localhost"),
-    port=os.environ.get("MARIADB_PORT", "3306"),
-)
-engine = sa.create_engine(DB_URL, pool_pre_ping=True, connect_args={"connect_timeout": 3})
+# 교안에서 다룬 SQLAlchemy 연결 패턴 그대로 사용. MariaDB에서 PostgreSQL로 이전하면서
+# 드라이버만 pymysql -> psycopg3로 바뀌었고, 쿼리는 표준 SQL이라 한 줄도 손대지 않았다.
+# 접속 정보가 아예 없으면(예: zip을 풀어서 채점할 때) DB 연결을 시도하지 않고 바로 로컬
+# CSV로 넘어간다 - 안 그러면 존재하지 않는 호스트에 붙으려다 수십 초씩 멈춘다.
+from db_url import build_db_url, has_db_config
+
+HAS_DB_CONFIG = has_db_config()
+DB_URL = build_db_url()
+engine = sa.create_engine(DB_URL, pool_pre_ping=True, connect_args={"connect_timeout": 5})
 
 st.set_page_config(page_title="조선소 생산관리 ML 대시보드", page_icon="⚓", layout="wide")
 
@@ -325,7 +322,7 @@ DATA_DIR = BASE / "data"
 
 @st.cache_data
 def load_data():
-    """MARIADB_HOST가 설정돼 있으면 MariaDB(Cloudtype) 접속을 시도하고, 설정이 없거나 접속에
+    """접속 정보가 설정돼 있으면 PostgreSQL 접속을 시도하고, 설정이 없거나 접속에
     실패하면(예: 채점자가 zip을 풀어서 로컬에서 바로 실행하는 경우) data/production_records.csv
     스냅샷으로 자동 대체한다 - 외부 DB 크리덴셜 없이도 `streamlit run app.py`만으로 항상 동작하게 하기 위함."""
     if HAS_DB_CONFIG:
@@ -587,7 +584,7 @@ if active_section == SECTIONS[1]:
 import sqlalchemy as sa
 import pandas as pd
 
-engine = sa.create_engine("mysql+pymysql://root:***@localhost:3306/shiphub")
+engine = sa.create_engine("postgresql+psycopg://USER:***@HOST/shiphub")
 
 query = \"\"\"
 {PRODUCTION_JOIN_SQL}
