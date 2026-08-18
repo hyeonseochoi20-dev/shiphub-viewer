@@ -291,7 +291,7 @@ def section(num, title, subtitle=None):
 
 
 # ---------------------------------------------------------------------------
-# 2. 데이터 준비 - MariaDB 정규화 스키마(dim_*/fact_*)를 JOIN하는 뷰에서 조회
+# 2. 데이터 준비 - PostgreSQL 정규화 스키마(dim_*/fact_*)를 JOIN하는 뷰에서 조회
 # ---------------------------------------------------------------------------
 # 이 두 상수는 실제 실행되는 쿼리가 아니라 2번 탭에서 st.code로 JOIN 과정을 보여주기 위한 문서용 텍스트다.
 # 실제 조회는 schema.sql에 정의된 v_production_records/v_review_sessions 뷰(동일한 JOIN을 DB에 한 번만
@@ -329,7 +329,7 @@ def load_data():
         try:
             with engine.connect() as conn:
                 df = pd.read_sql(sa.text("SELECT * FROM v_production_records;"), conn)
-            st.session_state["data_source"] = "MariaDB (Cloudtype 실시간)"
+            st.session_state["data_source"] = "PostgreSQL (Neon 실시간 조회)"
             return df
         except Exception:
             pass
@@ -463,9 +463,9 @@ if active_section == SECTIONS[0]:
 
     st.markdown(f"""
 수집 방법: 조선 BIM/CAD 경량화 변환 서비스(`converter.py`)가 IFC/DXF 파일을 glTF로 변환할 때마다
-형상 복잡도(삼각형 수, 파일 크기)를 MariaDB에 기록한다. 이 실제 변환 파이프라인의 출력 구조를 그대로 정규화된
+형상 복잡도(삼각형 수, 파일 크기)를 PostgreSQL에 기록한다. 이 실제 변환 파이프라인의 출력 구조를 그대로 정규화된
 스키마로 삼아, 동일한 통계적 특성(형상이 복잡할수록 공정 지연·QA 결함이 늘어나는 상관관계)을 갖는 가상 생산 레코드를
-`setup_mariadb.py`로 생성했다 (`np.random.default_rng` 시드 고정으로 재현 가능).
+`setup_postgres.py`로 생성했다 (`np.random.default_rng` 시드 고정으로 재현 가능).
 
 현재 조선소 동시 수주잔량을 흉내내어 선종 {raw_df['ship_type'].nunique()}종 · 동시 건조 {raw_df['vessel_id'].nunique()}척 ·
 블록 {len(raw_df):,}건 규모로 구성했다. 선종 구성과 척수는 2026년 삼성중공업 실제 상선 수주 공시
@@ -1329,7 +1329,7 @@ if active_section == SECTIONS[7]:
             "① 3D 뷰어 — React + Three.js로 경량 형상 렌더링 기반 구축",
             "② 변환 파이프라인 — IFC/DXF → glTF(SLF) 배치 변환 서비스",
             "③ 생산 데이터/ROI 모델링 — 가상 생산 레코드 + 경량화 도입 효용성 시뮬레이션",
-            "④ SQLite → MariaDB 마이그레이션 — 정규화 스키마(dim_*/fact_*)로 재설계",
+            "④ SQLite → MariaDB → PostgreSQL 마이그레이션 — 정규화 스키마(dim_*/fact_*)로 재설계",
             "⑤ 머신러닝 대시보드 — 전처리·EDA·회귀/분류 예측을 갖춘 이 Streamlit 앱",
             "⑥ AI 에이전트 연동 — MCP 서버 + REST API로 생산 DB/예측모델을 도구화",
         ]
@@ -1355,9 +1355,9 @@ if active_section == SECTIONS[7]:
             ("struct (표준 라이브러리)", "glTF 바이너리(.bin) 직접 패킹"),
         ]),
         ("데이터베이스", [
-            ("MariaDB 11.2", "정규화 스키마(dim_*/fact_*), Cloudtype 클라우드 호스팅"),
+            ("PostgreSQL 18", "정규화 스키마(dim_*/fact_*) · 도메인 타입 · 조인 뷰 2종"),
             ("SQLAlchemy", "쿼리 엔진 · 커넥션 관리"),
-            ("PyMySQL", "MariaDB 드라이버"),
+            ("psycopg 3", "PostgreSQL 드라이버 (바이너리 휠)"),
             ("SQLite", "로컬 오프라인 백업 경로용 (generate_*.py)"),
         ]),
         ("머신러닝 · 데이터 분석", [
@@ -1373,7 +1373,7 @@ if active_section == SECTIONS[7]:
             ("Flask REST API (/api/ai/*)", "3D 뷰어 내 AI 쿼리 패널이 직접 호출하는 동일 로직"),
         ]),
         ("인프라", [
-            ("Cloudtype", "MariaDB 무료 클라우드 호스팅"),
+            ("Neon", "서버리스 PostgreSQL 무료 호스팅"),
             ("총 라이선스 비용", "₩0 (100% 오픈소스/무료 소프트웨어)"),
         ]),
     ]
