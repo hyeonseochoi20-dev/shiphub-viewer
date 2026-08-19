@@ -18,7 +18,7 @@ const fetchJson = async (url, expect) => {
 // 목록이 배열이 아닐 때도 화면이 죽지 않도록 감싸 준다.
 const asArray = (v) => (Array.isArray(v) ? v : [])
 
-// MariaDB 생산 DB를 REST로 직접 조회하는 패널 (converter.py의 /api/ai/* 엔드포인트,
+// PostgreSQL 생산 DB를 REST로 직접 조회하는 패널 (converter.py의 /api/ai/* 엔드포인트,
 // production_data.py 공용 로직 - mcp_server.py와 동일한 쿼리/모델을 로컬 HTTP로 노출)
 
 // 공정단계별 색상 - 실제 블록별 3D 형상 임베딩/썸네일은 없으므로(메타데이터 기반 최근접
@@ -174,7 +174,7 @@ export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
     <div className="bg-gray-800/90 backdrop-blur rounded-lg p-4 w-[min(24rem,90vw)] border border-gray-700 max-h-[70vh] overflow-y-auto">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-1.5">
-          <FiZap className="w-3.5 h-3.5" /> AI 쿼리 (MariaDB 실시간)
+          <FiZap className="w-3.5 h-3.5" /> AI 쿼리 (PostgreSQL 실시간)
         </h3>
         <button onClick={() => setOpen(false)} className="p-1 rounded hover:bg-gray-700">
           <FiX className="w-3.5 h-3.5" />
@@ -202,7 +202,15 @@ export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
         </button>
       </div>
 
-      {error && <p className="text-[11px] text-red-400 mb-2">{error}</p>}
+      {error && (
+        <div className="text-[11px] mb-2 rounded bg-red-950/50 border border-red-900 p-2 space-y-1">
+          <p className="text-red-300">생산 DB에 연결하지 못했습니다. 조회 기능은 잠시 사용할 수 없습니다.</p>
+          <details className="text-red-400/70">
+            <summary className="cursor-pointer select-none">자세히</summary>
+            <p className="mt-1 break-all font-mono leading-relaxed">{error}</p>
+          </details>
+        </div>
+      )}
 
       {mode === 'faq' && (
         <div className="flex flex-col">
