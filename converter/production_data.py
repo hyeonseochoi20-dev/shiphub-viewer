@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ShipHub 생산 DB(MariaDB) 조회 + 예측 모델 공용 로직
+ShipHub 생산 DB(PostgreSQL) 조회 + 예측 모델 공용 로직
 - mcp_server.py(MCP 도구)와 converter.py(Flask REST API)가 동일한 이 모듈을 재사용해서
   쿼리/모델 학습 로직이 여러 곳에 따로 구현되는 것을 막는다.
 - app.py(Streamlit)는 @st.cache_data 기반 캐싱이 이 모듈의 전역 캐시와 성격이 달라 별도 유지.
@@ -207,7 +207,7 @@ def get_faq_answers():
     return [
         {
             "question": "지금 총 몇 개의 형상(블록)을 관리하고 있어?",
-            "answer": f"현재 {total_ship_types}개 선종 · {total_vessels}척 · 블록 {total_blocks:,}개를 MariaDB에서 관리하고 있습니다.",
+            "answer": f"현재 {total_ship_types}개 선종 · {total_vessels}척 · 블록 {total_blocks:,}개를 PostgreSQL에서 관리하고 있습니다.",
         },
         {
             "question": "원본 CAD 대비 압축률이 어느 정도야?",
