@@ -1,39 +1,50 @@
 /**
- * 클릭인지 드래그인지 판정한다.
+ * 3D 캔버스에서 '점 찍기'로 볼 클릭을 판정한다.
  *
- * 왜 따로 뺐나
- *   측정·주석·반지름 세 도구가 각각 "4픽셀 이상 움직였으면 드래그"라고 판정하고 있었다.
- *   그런데 이 4는 CSS 픽셀 기준이라, 2560x1600을 150%로 쓰는 화면에서는 손끝의 미세한
- *   떨림만으로도 넘어간다. 실제로 "백 번 눌러야 한 번 찍힌다"는 증상이 여기서 나왔다.
+ * 왜 이렇게 바뀌었나
+ *   처음에는 pointerdown/up 사이의 이동 거리를 직접 재서 "4픽셀 넘으면 드래그"로 판정했다.
+ *   그런데 그 4는 CSS 픽셀이라 고배율 화면에서 손떨림만으로 넘어갔고, 배율에 비례시켜
+ *   키워봐도 환경에 따라 여전히 안 찍히는 경우가 남았다. 임계값을 계속 조정하는 접근
+ *   자체가 틀렸다 - 브라우저는 이미 플랫폼별로 이 판정을 하고 있고, 그 결과가 click 이벤트다.
  *
- * 어떻게 고쳤나
- *   - 임계값을 화면 배율(devicePixelRatio)에 비례시킨다. 고DPI일수록 같은 손떨림이
- *     더 큰 CSS 픽셀 변위로 잡히므로 허용치도 같이 커져야 한다.
- *   - 포인터 종류를 본다. 마우스보다 터치/펜이 훨씬 많이 흔들린다.
- *   - 시간도 함께 본다. 궤도 회전은 보통 길게 끌기 때문에, 짧게 눌렀다 뗐으면
- *     조금 움직였어도 클릭으로 본다. 반대로 오래 눌렀으면 거리와 무관하게 드래그다.
+ *   그래서 click 이벤트를 그대로 쓴다. 브라우저가 클릭이라고 하면 클릭이다.
+ *   다만 궤도 회전을 크게 돌린 뒤에도 click 이 뜨는 브라우저가 있어, 그것만 걸러낸다.
+ *   기준은 아주 느슨하게(25px) 둔다 - 실수로 점을 하나 더 찍는 것이,
+ *   눌러도 아무 반응이 없는 것보다 낫다.
  */
 
-const BASE_PX = 4          // 마우스 기준 기본 허용 변위(CSS 픽셀)
-const TOUCH_MULT = 2.5     // 터치/펜은 접촉면이 넓어 더 많이 흔들린다
-const QUICK_MS = 250       // 이 시간 안에 뗐으면 짧은 클릭으로 본다
-const QUICK_MULT = 2.0     // 짧은 클릭에는 변위를 더 너그럽게 본다
-const HOLD_MS = 600        // 이보다 오래 눌렀으면 움직임이 적어도 드래그로 본다
+const DRAG_PX = 25      // 이만큼 넘게 끌었으면 궤도 회전으로 본다
+const DRAG_MS = 800     // 이보다 오래 눌렀으면 회전으로 본다
 
-export function dragThresholdPx(pointerType = 'mouse', quick = false) {
-  const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 3)
-  let px = BASE_PX * dpr
-  if (pointerType === 'touch' || pointerType === 'pen') px *= TOUCH_MULT
-  if (quick) px *= QUICK_MULT
-  return px
-}
+/**
+ * 캔버스에 클릭 처리기를 붙인다. 정리 함수를 돌려준다.
+ * @param {HTMLElement} el 대상 캔버스
+ * @param {(e: PointerEvent|MouseEvent) => void} onPick 클릭으로 판정됐을 때 호출
+ */
+export function attachPickHandler(el, onPick) {
+  let down = null
 
-/** 눌렀다 뗀 한 쌍이 '클릭'으로 볼 만한가 */
-export function isClick(down, up) {
-  if (!down) return false
-  const dt = (up.timeStamp ?? performance.now()) - (down.timeStamp ?? 0)
-  if (dt > HOLD_MS) return false                       // 오래 끌었으면 궤도 회전
-  const dx = up.clientX - down.clientX
-  const dy = up.clientY - down.clientY
-  return Math.hypot(dx, dy) <= dragThresholdPx(up.pointerType || down.pointerType, dt <= QUICK_MS)
+  const handleDown = (e) => {
+    if (e.button !== undefined && e.button !== 0) { down = null; return }  // 좌클릭만
+    down = { x: e.clientX, y: e.clientY, t: e.timeStamp }
+  }
+
+  const handleClick = (e) => {
+    const d = down
+    down = null
+    // down 을 못 잡았어도(캡처 순서 등) 브라우저가 click 이라 했으면 존중한다
+    if (d) {
+      const moved = Math.hypot(e.clientX - d.x, e.clientY - d.y)
+      const held = e.timeStamp - d.t
+      if (moved > DRAG_PX || held > DRAG_MS) return
+    }
+    onPick(e)
+  }
+
+  el.addEventListener('pointerdown', handleDown)
+  el.addEventListener('click', handleClick)
+  return () => {
+    el.removeEventListener('pointerdown', handleDown)
+    el.removeEventListener('click', handleClick)
+  }
 }

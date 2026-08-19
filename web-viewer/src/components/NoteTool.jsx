@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { isClick } from './clickIntent'
+import { attachPickHandler } from './clickIntent'
 import { useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
@@ -21,7 +21,6 @@ export default function NoteTool({ active, snapRef, notes, onAddNote, onDeleteNo
   const [pendingPoint, setPendingPoint] = useState(null)
   const [draft, setDraft] = useState('')
   const [openNoteId, setOpenNoteId] = useState(null)
-  const downPos = useRef(null)
   const raycaster = useRef(new THREE.Raycaster())
 
   useEffect(() => {
@@ -29,15 +28,7 @@ export default function NoteTool({ active, snapRef, notes, onAddNote, onDeleteNo
       setPendingPoint(null)
       return
     }
-    const onDown = (e) => {
-      downPos.current = { clientX: e.clientX, clientY: e.clientY,
-                          timeStamp: e.timeStamp, pointerType: e.pointerType }
-    }
-    const onUp = (e) => {
-      if (!downPos.current) return
-      const down = downPos.current
-      downPos.current = null
-      if (!isClick(down, e)) return   // 궤도 회전 드래그는 무시
+    const onPick = (e) => {
 
       let hitPoint = snapRef?.current?.point
       if (!hitPoint) {
@@ -56,12 +47,7 @@ export default function NoteTool({ active, snapRef, notes, onAddNote, onDeleteNo
         setDraft('')
       }
     }
-    gl.domElement.addEventListener('pointerdown', onDown)
-    gl.domElement.addEventListener('pointerup', onUp)
-    return () => {
-      gl.domElement.removeEventListener('pointerdown', onDown)
-      gl.domElement.removeEventListener('pointerup', onUp)
-    }
+    return attachPickHandler(gl.domElement, onPick)
   }, [active, gl, camera, scene, snapRef])
 
   const saveNote = () => {

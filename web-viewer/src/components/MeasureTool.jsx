@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { isClick } from './clickIntent'
+import { attachPickHandler } from './clickIntent'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Line, Html } from '@react-three/drei'
 import * as THREE from 'three'
@@ -19,7 +19,6 @@ export default function MeasureTool({ active, snapRef }) {
   const { gl, camera, scene } = useThree()
   const [points, setPoints] = useState([])
   const [lengthAxis, setLengthAxis] = useState('x') // 씬의 실제 길이축(x 또는 z) 자동 판별
-  const downPos = useRef(null)
   const raycaster = useRef(new THREE.Raycaster())
   const axisLockedRef = useRef(false)
 
@@ -46,15 +45,7 @@ export default function MeasureTool({ active, snapRef }) {
       return
     }
 
-    const onDown = (e) => {
-      downPos.current = { clientX: e.clientX, clientY: e.clientY,
-                          timeStamp: e.timeStamp, pointerType: e.pointerType }
-    }
-    const onUp = (e) => {
-      if (!downPos.current) return
-      const down = downPos.current
-      downPos.current = null
-      if (!isClick(down, e)) return   // 궤도 회전 드래그는 무시
+    const onPick = (e) => {
 
       // SnapEngine이 실시간으로 판정해둔 꼭지점/모서리/면 스냅 좌표를 우선 사용 (정밀 클릭)
       let hitPoint = snapRef?.current?.point
@@ -77,12 +68,7 @@ export default function MeasureTool({ active, snapRef }) {
       }
     }
 
-    gl.domElement.addEventListener('pointerdown', onDown)
-    gl.domElement.addEventListener('pointerup', onUp)
-    return () => {
-      gl.domElement.removeEventListener('pointerdown', onDown)
-      gl.domElement.removeEventListener('pointerup', onUp)
-    }
+    return attachPickHandler(gl.domElement, onPick)
   }, [active, gl, camera, scene, snapRef])
 
   if (!active || points.length < 1) return null
