@@ -8,6 +8,7 @@ import FLNGShip from './components/FLNGShip'
 import FileTree from './components/FileTree'
 import StatusPanel from './components/StatusPanel'
 import AIQueryPanel from './components/AIQueryPanel'
+import ErrorBoundary from './components/ErrorBoundary'
 import ModelLoader from './components/ModelLoader'
 import ViewerErrorBoundary from './components/ViewerErrorBoundary'
 import BatchPanel from './components/BatchPanel'
@@ -364,7 +365,7 @@ export default function App() {
               if (isMobile) {
                 const sheets = {
                   tools: { label: '도구', icon: FiSliders, content: toolsPanelEl },
-                  ai: { label: 'AI', icon: FiZap, content: <AIQueryPanel forceOpen onFlyToBlock={flyToBlock} /> },
+                  ai: { label: 'AI', icon: FiZap, content: <ErrorBoundary label="AI 쿼리"><AIQueryPanel forceOpen onFlyToBlock={flyToBlock} /></ErrorBoundary> },
                   info: { label: '정보', icon: FiInfo, content: <div className="space-y-3">{infoStackEl}</div> },
                   batch: { label: '배치', icon: FiUploadCloud, content: <BatchPanel /> },
                 }
@@ -400,7 +401,9 @@ export default function App() {
                 <>
                   {/* 상태 패널 */}
                   <div className="absolute top-4 right-4 space-y-3">
-                    <AIQueryPanel onFlyToBlock={flyToBlock} />
+                    <ErrorBoundary label="AI 쿼리">
+                      <AIQueryPanel onFlyToBlock={flyToBlock} />
+                    </ErrorBoundary>
                     {infoStackEl}
                   </div>
 

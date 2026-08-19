@@ -1,3 +1,7 @@
+# PostgreSQL(Neon) 이전 후 구성.
+# 관리형 서비스는 접속 정보를 DATABASE_URL 하나로 주므로 그 키만 받는다
+# (db_url.py가 이 값을 읽어 psycopg 드라이버를 붙인 URL로 변환한다).
+# sync: false = 값은 저장소에 두지 않고 Render 대시보드에서 직접 입력한다.
 services:
   - type: web
     name: shiphub-api
@@ -7,13 +11,7 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python converter.py
     envVars:
-      - key: MARIADB_HOST
-        sync: false
-      - key: MARIADB_PORT
-        sync: false
-      - key: MARIADB_USER
-        sync: false
-      - key: MARIADB_PASSWORD
+      - key: DATABASE_URL
         sync: false
 
   - type: web
@@ -24,11 +22,5 @@ services:
     buildCommand: pip install -r requirements-dashboard.txt
     startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
     envVars:
-      - key: MARIADB_HOST
-        sync: false
-      - key: MARIADB_PORT
-        sync: false
-      - key: MARIADB_USER
-        sync: false
-      - key: MARIADB_PASSWORD
+      - key: DATABASE_URL
         sync: false

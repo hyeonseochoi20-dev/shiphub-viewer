@@ -2,6 +2,22 @@ import React, { useState, useEffect, useRef } from 'react'
 import { FiSearch, FiZap, FiX, FiMessageCircle, FiCrosshair } from 'react-icons/fi'
 import { API_BASE } from '../config'
 
+// 서버가 500을 내면 본문이 {error:"..."} 객체로 온다. r.json()만 하면 그 객체가 그대로
+// 상태에 들어가고, 렌더에서 .map()을 호출하는 순간 TypeError로 트리 전체가 죽는다
+// (화면이 통째로 사라지던 원인). 상태에 넣기 전에 형태까지 확인한다.
+const fetchJson = async (url, expect) => {
+  const r = await fetch(url)
+  const data = await r.json().catch(() => null)
+  if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`)
+  if (expect === 'array' && !Array.isArray(data)) throw new Error('예상과 다른 응답 형식')
+  if (expect === 'object' && (!data || typeof data !== 'object' || Array.isArray(data)))
+    throw new Error('예상과 다른 응답 형식')
+  return data
+}
+
+// 목록이 배열이 아닐 때도 화면이 죽지 않도록 감싸 준다.
+const asArray = (v) => (Array.isArray(v) ? v : [])
+
 // MariaDB 생산 DB를 REST로 직접 조회하는 패널 (converter.py의 /api/ai/* 엔드포인트,
 // production_data.py 공용 로직 - mcp_server.py와 동일한 쿼리/모델을 로컬 HTTP로 노출)
 
@@ -48,18 +64,16 @@ export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
 
   useEffect(() => {
     if (!open || filters) return
-    fetch(`${API_BASE}/api/ai/filters`)
-      .then((r) => r.json())
+    fetchJson(`${API_BASE}/api/ai/filters`, 'object')
       .then(setFilters)
-      .catch(() => setError('필터 목록을 불러오지 못했습니다 (converter.py가 MariaDB에 연결되어 있는지 확인)'))
+      .catch((e) => setError(`필터 목록을 불러오지 못했습니다 — ${e.message}`))
   }, [open, filters])
 
   useEffect(() => {
     if (!open || faq) return
-    fetch(`${API_BASE}/api/ai/faq`)
-      .then((r) => r.json())
+    fetchJson(`${API_BASE}/api/ai/faq`, 'array')
       .then(setFaq)
-      .catch(() => setError('FAQ를 불러오지 못했습니다'))
+      .catch((e) => setError(`FAQ를 불러오지 못했습니다 — ${e.message}`))
   }, [open, faq])
 
   useEffect(() => {
@@ -207,7 +221,7 @@ export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
 
           {chatLog.length > 0 && (
             <div className="space-y-2.5 mb-3 max-h-56 overflow-y-auto pr-1">
-              {chatLog.map((m, i) =>
+              {asArray(chatLog).map((m, i) =>
                 m.role === 'user' ? (
                   <div key={i} className="flex justify-end">
                     <div className="bg-blue-600 text-white rounded-lg rounded-tr-sm px-3 py-1.5 text-[11px] max-w-[85%]">
@@ -243,7 +257,7 @@ export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
           )}
 
           <div className="flex flex-wrap gap-1.5">
-            {faq && faq.map((item, i) => (
+            {asArray(faq).map((item, i) => (
               <button
                 key={i}
                 onClick={() => askFaq(item)}
@@ -264,19 +278,19 @@ export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
           <div className="grid grid-cols-2 gap-1.5">
             <select value={queryParams.ship_type} onChange={(e) => setQueryParams((q) => ({ ...q, ship_type: e.target.value }))} className={selectClass}>
               <option value="">전체 선종</option>
-              {filters.ship_type.map((v) => <option key={v} value={v}>{v}</option>)}
+              {asArray(filters.ship_type).map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
             <select value={queryParams.department} onChange={(e) => setQueryParams((q) => ({ ...q, department: e.target.value }))} className={selectClass}>
               <option value="">전체 부서</option>
-              {filters.department.map((v) => <option key={v} value={v}>{v}</option>)}
+              {asArray(filters.department).map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
             <select value={queryParams.priority} onChange={(e) => setQueryParams((q) => ({ ...q, priority: e.target.value }))} className={selectClass}>
               <option value="">전체 우선순위</option>
-              {filters.priority.map((v) => <option key={v} value={v}>{v}</option>)}
+              {asArray(filters.priority).map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
             <select value={queryParams.qa_status} onChange={(e) => setQueryParams((q) => ({ ...q, qa_status: e.target.value }))} className={selectClass}>
               <option value="">전체 QA상태</option>
-              {filters.qa_status.map((v) => <option key={v} value={v}>{v}</option>)}
+              {asArray(filters.qa_status).map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
           </div>
           <button
@@ -288,7 +302,7 @@ export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
           </button>
 
           <div className="space-y-1.5 mt-2">
-            {results.map((r) => (
+            {asArray(results).map((r) => (
               <div key={r.block_id} className="bg-gray-900/60 rounded p-2 text-[11px]">
                 <div className="flex justify-between gap-2">
                   <span className="font-mono text-gray-300 truncate">{r.block_name}</span>
@@ -318,7 +332,7 @@ export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
                 공정단계 색상·복잡도 막대로 비슷한 형상끼리 한눈에 훑어보고, 엉뚱한 블록을 고르는 오작업을 줄이기 위한 목록입니다
               </p>
               <div className="space-y-1.5">
-                {similar.results.map((r) => {
+                {asArray(similar.results).map((r) => {
                   const stage = STAGE_STYLE[r.process_stage] || { bg: 'bg-gray-600' }
                   const pct = complexityPct(r.triangle_count)
                   return (
@@ -361,19 +375,19 @@ export default function AIQueryPanel({ forceOpen = false, onFlyToBlock }) {
           <div className="grid grid-cols-2 gap-1.5">
             <select value={predictForm.ship_type} onChange={(e) => setPredictForm((f) => ({ ...f, ship_type: e.target.value }))} className={selectClass}>
               <option value="">선종 선택</option>
-              {filters.ship_type.map((v) => <option key={v} value={v}>{v}</option>)}
+              {asArray(filters.ship_type).map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
             <select value={predictForm.department} onChange={(e) => setPredictForm((f) => ({ ...f, department: e.target.value }))} className={selectClass}>
               <option value="">부서 선택</option>
-              {filters.department.map((v) => <option key={v} value={v}>{v}</option>)}
+              {asArray(filters.department).map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
             <select value={predictForm.process_stage} onChange={(e) => setPredictForm((f) => ({ ...f, process_stage: e.target.value }))} className={selectClass}>
               <option value="">공정 선택</option>
-              {filters.process_stage.map((v) => <option key={v} value={v}>{v}</option>)}
+              {asArray(filters.process_stage).map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
             <select value={predictForm.priority} onChange={(e) => setPredictForm((f) => ({ ...f, priority: e.target.value }))} className={selectClass}>
               <option value="">우선순위 선택</option>
-              {filters.priority.map((v) => <option key={v} value={v}>{v}</option>)}
+              {asArray(filters.priority).map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-1.5">
