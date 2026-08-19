@@ -462,10 +462,17 @@
 
   <section class="reveal">
     <div class="sec-head"><div class="num">05 / DEMO</div><h2>실행 화면</h2></div>
+    <div class="sec-body"><div class="spacer"></div><div><p class="lede">경량 뷰어 · 탑재 시뮬레이션 · 생산관리 대시보드를 5분 27초로 이어 붙인 시연 영상이다. 해설 음성이 들어 있으니 소리를 켜고 보길 권한다.</p></div></div>
     <div class="viewport" id="demoViewport">
       <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
-      <video src="shiphub-demo.mp4" autoplay muted loop playsinline controls
-           style="width:100%; height:100%; object-fit:cover; position:relative; z-index:1;"
+      <!-- 나레이션이 들어간 5분 27초 시연 영상. 이전에는 무음 루프였기 때문에
+           autoplay muted loop 였는데, 해설이 있는 영상에서는 그 셋이 모두 해가 된다.
+           소리 없이 저절로 흐르다 되감기고, 40MB를 페이지 진입만으로 받아버린다.
+           preload=metadata 로 재생을 누를 때까지 본문을 내려받지 않게 하고,
+           object-fit:contain 으로 화면 가장자리가 잘리지 않게 한다(대시보드 수치를 읽어야 한다). -->
+      <video src="shiphub-demo.mp4" controls playsinline preload="metadata"
+           style="width:100%; height:100%; object-fit:contain; background:#0b1020;
+                            position:relative; z-index:1;"
            onerror="this.style.display='none'; document.getElementById('demoFallback').style.display='flex';"></video>
       <div class="sweep" id="demoFallback" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center;">
         <div class="msg">VIDEO SLOT — 16:9<br>shiphub-demo.mp4를 web-viewer/public/에 넣어주세요</div>
