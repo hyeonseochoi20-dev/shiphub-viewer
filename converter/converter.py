@@ -15,6 +15,7 @@ import sys
 import sqlite3
 import struct
 import threading
+import time
 import ezdxf
 from pathlib import Path
 from datetime import datetime
@@ -32,6 +33,51 @@ app = Flask(__name__)
 # 이 API는 인증이 없는 포트폴리오용 공개 데모라 오리진을 넓게 허용해도 새로 노출되는
 # 권한은 없다(브라우저 CORS는 서버 접근 자체를 막지 않고 XHR/fetch의 same-origin만 완화한다).
 CORS(app)
+
+# ---------------------------------------------------------------------------
+# 접근 로깅 — 이 API가 실제로 쓰이고 있다는 증거를 남긴다.
+#
+# 사내에서 안 쓰이는 시스템은 사용량을 근거로 정리된다. 그런데 "얼마나 쓰이는가"는
+# 남겨두지 않으면 나중에 되살릴 수 없는 정보다. 요청 한 건마다 아래를 남긴다.
+#   - 무엇을: 경로·메서드·질의 조건(값이 아니라 어떤 필터를 걸었는지)
+#   - 누가: 클라이언트 식별자를 해시로만 (원문 IP는 저장하지 않는다)
+#   - 얼마나: 응답 상태·소요시간·응답 크기
+# 인증이 없는 데모라 '누가'는 IP 해시가 최선이다. 사내 배포 시에는
+# 리버스 프록시가 넣어주는 사용자 헤더(X-Forwarded-User 등)를 그대로 쓰면 된다.
+# ---------------------------------------------------------------------------
+from obs import get_logger, log_event, anon
+
+_access_log = get_logger("api")
+
+
+@app.before_request
+def _obs_start():
+    request._obs_t0 = time.perf_counter()
+
+
+@app.after_request
+def _obs_end(response):
+    try:
+        dt = (time.perf_counter() - getattr(request, "_obs_t0", time.perf_counter())) * 1000
+        # 프록시 뒤에 있으면 X-Forwarded-For 의 첫 주소가 실제 클라이언트다
+        fwd = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+        who = request.headers.get("X-Forwarded-User") or fwd or request.remote_addr
+        log_event(
+            _access_log, "http_request",
+            method=request.method,
+            path=request.path,
+            status=response.status_code,
+            latency_ms=round(dt, 1),
+            bytes=response.calculate_content_length() or 0,
+            # 질의 '조건'만 남긴다 - 어떤 필터가 실제로 쓰이는지 알아야 기능을 정리할 수 있다
+            params=sorted(request.args.keys()),
+            client=anon(who),
+            ua=(request.headers.get("User-Agent") or "")[:120],
+            referer=(request.headers.get("Referer") or "")[:160],
+        )
+    except Exception:
+        pass                                   # 관측 실패가 응답을 막으면 안 된다
+    return response
 
 # 설정
 INPUT_DIR = Path("input_models")

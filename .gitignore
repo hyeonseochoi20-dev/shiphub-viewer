@@ -25,3 +25,6 @@ build/
 .env
 *.local.json
 .DS_Store
+
+# 관측 로그 - 런타임 산출물이라 저장소에 올리지 않는다
+converter/logs/

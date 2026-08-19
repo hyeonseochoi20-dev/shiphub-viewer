@@ -43,7 +43,8 @@ plt.rcParams["axes.unicode_minus"] = False  # 한글 폰트 사용 시 마이너
 # 드라이버만 pymysql -> psycopg3로 바뀌었고, 쿼리는 표준 SQL이라 한 줄도 손대지 않았다.
 # 접속 정보가 아예 없으면(예: zip을 풀어서 채점할 때) DB 연결을 시도하지 않고 바로 로컬
 # CSV로 넘어간다 - 안 그러면 존재하지 않는 호스트에 붙으려다 수십 초씩 멈춘다.
-from db_url import build_db_url, has_db_config
+from db_url import build_db_url
+from obs import get_logger, log_event, new_session_id, timed, has_db_config
 
 HAS_DB_CONFIG = has_db_config()
 DB_URL = build_db_url()
@@ -487,6 +488,18 @@ with st.sidebar:
         st.rerun()
     st.caption(f"데이터 소스: {st.session_state.get('data_source', '-')}")
 
+# ---------------------------------------------------------------------------
+# 사용량 계측 — 어느 탭이 실제로 쓰이는지 남긴다.
+#
+# Streamlit은 상호작용마다 스크립트를 처음부터 다시 실행한다. 그래서 세션 식별자를
+# session_state에 담아 두어야 '한 사람의 한 방문'을 하나로 묶을 수 있다.
+# 그렇지 않으면 클릭 한 번이 새 사용자로 잡혀 사용량이 부풀려진다.
+# ---------------------------------------------------------------------------
+_ulog = get_logger("dashboard")
+if "_session_id" not in st.session_state:
+    st.session_state["_session_id"] = new_session_id()
+    log_event(_ulog, "session_start", session=st.session_state["_session_id"])
+
 SECTIONS = ["1. 데이터 정의", "2. 데이터 준비", "3. 데이터 전처리", "4. 데이터 분석(EDA)", "5. 학습·예측·평가", "6. 성능 향상", "7. 실시간 예측", "8. 기술 스택"]
 
 # st.tabs()는 화면에 보이는 탭과 무관하게 8개 탭 본문을 매 재실행마다 전부 실행해서
@@ -510,6 +523,12 @@ if active_section is None:
 # ---------------------------------------------------------------------------
 # 1. 데이터 정의
 # ---------------------------------------------------------------------------
+# 탭이 바뀔 때만 남긴다(같은 탭에서 슬라이더를 움직일 때마다 쌓이면 사용량이 왜곡된다)
+if st.session_state.get("_last_section") != active_section:
+    st.session_state["_last_section"] = active_section
+    log_event(_ulog, "section_view", session=st.session_state["_session_id"],
+              section=active_section)
+
 if active_section == SECTIONS[0]:
     section("01", "프로젝트 소개 · 데이터 정의", "목표 · 수집 방법과 컬럼 사전")
     with st.container(border=True):
