@@ -43,9 +43,9 @@ plt.rcParams["axes.unicode_minus"] = False  # 한글 폰트 사용 시 마이너
 # 드라이버만 pymysql -> psycopg3로 바뀌었고, 쿼리는 표준 SQL이라 한 줄도 손대지 않았다.
 # 접속 정보가 아예 없으면(예: zip을 풀어서 채점할 때) DB 연결을 시도하지 않고 바로 로컬
 # CSV로 넘어간다 - 안 그러면 존재하지 않는 호스트에 붙으려다 수십 초씩 멈춘다.
-from db_url import build_db_url
+from db_url import build_db_url, has_db_config
 import ml_core
-from obs import get_logger, log_event, new_session_id, timed, has_db_config
+from obs import get_logger, log_event, new_session_id, timed
 
 HAS_DB_CONFIG = has_db_config()
 DB_URL = build_db_url()
