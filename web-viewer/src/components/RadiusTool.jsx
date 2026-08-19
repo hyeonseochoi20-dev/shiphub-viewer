@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { isClick } from './clickIntent'
 import { useThree } from '@react-three/fiber'
 import { Line, Html } from '@react-three/drei'
 import * as THREE from 'three'
@@ -57,14 +58,14 @@ export default function RadiusTool({ active, snapRef }) {
       return
     }
     const onDown = (e) => {
-      downPos.current = { x: e.clientX, y: e.clientY }
+      downPos.current = { clientX: e.clientX, clientY: e.clientY,
+                          timeStamp: e.timeStamp, pointerType: e.pointerType }
     }
     const onUp = (e) => {
       if (!downPos.current) return
-      const dx = e.clientX - downPos.current.x
-      const dy = e.clientY - downPos.current.y
+      const down = downPos.current
       downPos.current = null
-      if (Math.hypot(dx, dy) > 4) return
+      if (!isClick(down, e)) return   // 궤도 회전 드래그는 무시
 
       let hitPoint = snapRef?.current?.point
       if (!hitPoint) {

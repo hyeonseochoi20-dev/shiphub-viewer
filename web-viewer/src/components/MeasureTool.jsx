@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { isClick } from './clickIntent'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Line, Html } from '@react-three/drei'
 import * as THREE from 'three'
@@ -46,14 +47,14 @@ export default function MeasureTool({ active, snapRef }) {
     }
 
     const onDown = (e) => {
-      downPos.current = { x: e.clientX, y: e.clientY }
+      downPos.current = { clientX: e.clientX, clientY: e.clientY,
+                          timeStamp: e.timeStamp, pointerType: e.pointerType }
     }
     const onUp = (e) => {
       if (!downPos.current) return
-      const dx = e.clientX - downPos.current.x
-      const dy = e.clientY - downPos.current.y
+      const down = downPos.current
       downPos.current = null
-      if (Math.hypot(dx, dy) > 4) return // 드래그(궤도회전)는 무시
+      if (!isClick(down, e)) return   // 궤도 회전 드래그는 무시
 
       // SnapEngine이 실시간으로 판정해둔 꼭지점/모서리/면 스냅 좌표를 우선 사용 (정밀 클릭)
       let hitPoint = snapRef?.current?.point
